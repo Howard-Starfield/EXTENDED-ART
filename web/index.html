@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ExtendedArt Alignment Studio</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <div>
+        <strong>ExtendedArt</strong>
+        <span>Alignment Studio</span>
+      </div>
+    </div>
+    <div class="topbar-meta">
+      <span class="spec">Standard | 2232 &times; 3118 px | 300 DPI</span>
+      <span class="offline"><i></i> Offline</span>
+    </div>
+  </header>
+
+  <main class="studio-shell">
+    <aside class="rail upload-rail" aria-label="Source images">
+      <div class="rail-heading">
+        <span class="step">01</span>
+        <div><p>Load sources</p><small>Both files stay on this computer</small></div>
+      </div>
+
+      <label class="drop-card primary-drop" id="artDrop">
+        <input id="artInput" type="file" accept="image/png,image/jpeg,image/webp">
+        <span class="drop-topline"><strong>Extended 3&times;3 artwork</strong><span class="input-required">Required</span></span>
+        <span class="drop-visual"><span class="drop-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="4" width="18" height="16"/><circle cx="8.5" cy="9" r="1.6"/><path d="m4.5 18 5.1-5.1 3.3 3.3 2.1-2.1 4.5 4.5"/></svg></span><img class="image-preview" id="artPreview" alt="Extended artwork preview" hidden></span>
+        <span class="drop-copy">Drop or choose the Image 2 result</span>
+        <span class="file-details" id="artMeta">Required | PNG, JPG or WebP</span>
+      </label>
+
+      <label class="drop-card" id="cardDrop">
+        <input id="cardInput" type="file" accept="image/png,image/jpeg,image/webp">
+        <span class="drop-topline"><strong>Original game card</strong></span>
+        <span class="drop-visual"><span class="drop-icon card-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="4" y="2.5" width="16" height="19"/><path d="M4 7h16"/><circle cx="9" cy="12" r="2"/><path d="M6.2 18c.7-2 2-3 3.8-3s3.1 1 3.8 3M15 10h2.5M15 13h2.5"/></svg></span><img class="image-preview" id="cardPreview" alt="Original game card preview" hidden></span>
+        <span class="drop-copy">Used as the locked center reference</span>
+        <span class="file-details" id="cardMeta">Recommended for precise alignment</span>
+      </label>
+
+      <button class="auto-align-button" id="autoAlignButton" type="button" disabled>
+        <span class="auto-align-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="6.5"/><circle cx="12" cy="12" r="2"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg></span>
+        <span><strong>Auto align artwork</strong><small>Match the card art to the center</small></span>
+      </button>
+      <p class="auto-align-status" id="autoAlignStatus" role="status" aria-live="polite" hidden></p>
+
+      <div class="method-note">
+        <span>How it works</span>
+        <p>The center card stays fixed. Drag the extended artwork underneath it until colors, shapes and perspective meet at the card edges.</p>
+      </div>
+    </aside>
+
+    <section class="workspace" aria-label="Alignment canvas">
+      <div class="workspace-heading">
+        <div class="workspace-title"><span class="step">02</span><p>Align the scene</p></div>
+        <div class="view-tools" role="group" aria-label="Preview options">
+          <button class="tool-button active" id="gridToggle" type="button" aria-pressed="true">Grid</button>
+          <button class="tool-button active" id="cardToggle" type="button" aria-pressed="true">Card</button>
+          <button class="tool-button" id="differenceToggle" type="button" aria-pressed="false">Difference</button>
+        </div>
+      </div>
+
+      <div class="light-table">
+        <div class="ruler ruler-x"><span>0</span><span>63</span><span>126</span><span>189 mm</span></div>
+        <div class="ruler ruler-y"><span>0</span><span>88</span><span>176</span><span>264</span></div>
+        <div class="canvas-shell" id="canvasShell" tabindex="0">
+          <canvas id="alignmentCanvas"></canvas>
+          <div class="empty-state" id="emptyState">
+            <span class="empty-grid" aria-hidden="true"></span>
+            <strong>Place your extended artwork</strong>
+            <p>Drop the full 3&times;3 image on the left to begin.</p>
+          </div>
+          <span class="registration top-left" aria-hidden="true"></span>
+          <span class="registration top-right" aria-hidden="true"></span>
+          <span class="registration bottom-left" aria-hidden="true"></span>
+          <span class="registration bottom-right" aria-hidden="true"></span>
+          <div class="canvas-caption" aria-label="Alignment controls">
+            <span><kbd>Drag</kbd> move</span>
+            <span><kbd>Wheel</kbd> zoom</span>
+            <span><kbd>Arrows</kbd> 1 px</span>
+            <span><kbd>Shift</kbd> + arrows 10 px</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <aside class="rail control-rail" aria-label="Alignment controls">
+      <div class="rail-heading">
+        <span class="step">03</span>
+        <div><p>Refine & export</p><small>Use the card edges as your guide</small></div>
+      </div>
+
+      <div class="control-block">
+        <label for="zoomRange"><span>Artwork zoom</span><output id="zoomValue">100%</output></label>
+        <input id="zoomRange" type="range" min="100" max="250" value="100" step="1">
+      </div>
+
+      <div class="control-block">
+        <label for="opacityRange"><span>Card opacity</span><output id="opacityValue">72%</output></label>
+        <input id="opacityRange" type="range" min="0" max="100" value="72" step="1">
+      </div>
+
+      <div class="control-block">
+        <label for="radiusRange"><span>Corner roundness</span><output id="radiusValue">3 mm</output></label>
+        <input id="radiusRange" type="range" min="0" max="6" value="3" step="0.5">
+      </div>
+
+      <div class="control-block nudge-block">
+        <label><span>Precision nudge</span><output id="offsetValue">X 0 / Y 0</output></label>
+        <div class="nudge-pad">
+          <button type="button" data-nudge="0,-1" aria-label="Move up">&uarr;</button>
+          <button type="button" data-nudge="-1,0" aria-label="Move left">&larr;</button>
+          <button type="button" id="resetButton" aria-label="Reset alignment">C</button>
+          <button type="button" data-nudge="1,0" aria-label="Move right">&rarr;</button>
+          <button type="button" data-nudge="0,1" aria-label="Move down">&darr;</button>
+        </div>
+      </div>
+
+      <label class="check-row">
+        <input id="includeCard" type="checkbox" checked>
+        <span><strong>Print card in center</strong><small>Off is recommended when the real card goes in the binder.</small></span>
+      </label>
+
+      <button class="export-button" id="exportButton" type="button" disabled>
+        <span>Create print package</span>
+        <small>Master, 9 pieces, PDFs & ZIP</small>
+      </button>
+
+      <div class="result-panel" id="resultPanel" hidden>
+        <span class="result-kicker">Package ready</span>
+        <strong id="resultName"></strong>
+        <p id="resultNotes"></p>
+        <a class="download-button" id="downloadButton" href="#">Download ZIP</a>
+      </div>
+
+      <div class="quality-strip">
+        <span>Output contract</span>
+        <dl>
+          <div><dt>Master</dt><dd>2232 &times; 3118</dd></div>
+          <div><dt>Insert</dt><dd>744 &times; 1039</dd></div>
+          <div><dt>Print</dt><dd>300 DPI</dd></div>
+        </dl>
+      </div>
+    </aside>
+  </main>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="/app.js"></script>
+</body>
+</html>

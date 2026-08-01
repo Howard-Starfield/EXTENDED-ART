@@ -1,0 +1,13 @@
+{
+  "profile": "standard",
+  "source_mode": "crop",
+  "focus_x": 0.5,
+  "focus_y": 0.5,
+  "gap_mm": 2.0,
+  "scale_mode": "fit",
+  "safe_margin_mm": 4.0,
+  "corner_radius_mm": 0.0,
+  "keep_unzipped_package": true,
+  "poll_seconds": 2.0,
+  "settle_seconds": 3.0
+}
