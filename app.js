@@ -4,11 +4,11 @@ import {
   fallbackPapers,
   fallbackProfiles,
   PROFILE_VERSION,
-  paperFit,
   pixelPair,
   profileSummary,
   psaLabelBox as makePsaLabelBox,
 } from "./src/profiles.js";
+import { createPageLayout } from "./src/page-layout.js";
 import { createInitialState, imageSize, releaseImage } from "./src/state.js";
 import { fileSummary, readImage, replacePreviewUrl } from "./src/image-io.js";
 import { classifyEffectiveDpi } from "./src/quality.js";
@@ -98,17 +98,21 @@ function updatePaperTools() {
     ["letter", "#letterPaperTool", "#letterFit"],
   ].forEach(([paperName, buttonSelector, fitSelector]) => {
     const paper = state.papers[paperName] || fallbackPapers[paperName];
-    const fit = paperFit(profile, paperName, state.papers);
+    const layout = createPageLayout(profile, paper);
     const selected = state.paper === paperName;
-    const percent = fit.scale < 0.9995 ? `${(fit.scale * 100).toFixed(1)}%` : "100%";
+    const outputLabel = layout.pageCount > 1
+      ? `${layout.pageCount} pages · exact size`
+      : layout.warnings.length
+        ? "Exact size · margin note"
+        : "Exact size";
     const dimensions = paper.size_mm.map(cleanMeasure).join("×");
     const button = $(buttonSelector);
     button.classList.toggle("active", selected);
-    button.classList.toggle("scaled", fit.scale < 0.9995);
+    button.classList.toggle("scaled", layout.pageCount > 1 || layout.warnings.length > 0);
     button.setAttribute("aria-pressed", String(selected));
-    button.setAttribute("aria-label", `${paper.label} ${dimensions} millimetres, output at ${percent}`);
-    button.title = `${paper.label}: ${dimensions} mm | output ${percent}`;
-    $(fitSelector).textContent = `${dimensions} · ${percent}`;
+    button.setAttribute("aria-label", `${paper.label} ${dimensions} millimetres, ${outputLabel}`);
+    button.title = `${paper.label}: ${dimensions} mm | ${outputLabel}`;
+    $(fitSelector).textContent = `${dimensions} · ${outputLabel}`;
   });
 }
 

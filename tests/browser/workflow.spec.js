@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { TextWriter, Uint8ArrayReader, Uint8ArrayWriter, ZipReader } from "@zip.js/zip.js";
+import { PDFDocument } from "pdf-lib";
 import { readFileSync } from "node:fs";
 import { deflateSync } from "node:zlib";
 
@@ -82,6 +83,10 @@ test("auto-aligns after both required images decode", async ({ page }) => {
   await page.locator("label.paper-card").first().click();
   await page.getByRole("button", { name: "Open alignment studio" }).click();
   await expect(page.locator("#autoAlignButton")).toBeDisabled();
+  const a4Icon = await page.locator(".a4-icon").boundingBox();
+  const letterIcon = await page.locator(".letter-icon").boundingBox();
+  expect(a4Icon.width / a4Icon.height).toBeCloseTo(210 / 297, 2);
+  expect(letterIcon.width / letterIcon.height).toBeCloseTo(215.9 / 279.4, 2);
 
   await page.setInputFiles("#artInput", {
     name: "synthetic-3x3-scene.png",
@@ -185,6 +190,14 @@ test("auto-aligns after both required images decode", async ({ page }) => {
   expect(optionalNames).toContain("synthetic_3x3_scene_standard_letter_print_guide.pdf");
   expect(optionalNames).toContain("synthetic_3x3_scene_standard_letter_full_art_reference.pdf");
   expect(optionalNames).toContain("synthetic_3x3_scene_standard_letter_with_card_reference.pdf");
+  const a4CutReady = optionalEntries.find((entry) => entry.filename === "synthetic_3x3_scene_standard_a4_cut_ready.pdf");
+  const letterCutReady = optionalEntries.find((entry) => entry.filename === "synthetic_3x3_scene_standard_letter_cut_ready.pdf");
+  const a4Page = (await PDFDocument.load(await a4CutReady.getData(new Uint8ArrayWriter()))).getPages()[0].getMediaBox();
+  const letterPage = (await PDFDocument.load(await letterCutReady.getData(new Uint8ArrayWriter()))).getPages()[0].getMediaBox();
+  expect(a4Page.width).toBeCloseTo(595.2755905, 5);
+  expect(a4Page.height).toBeCloseTo(841.8897638, 5);
+  expect(letterPage.width).toBeCloseTo(612, 5);
+  expect(letterPage.height).toBeCloseTo(792, 5);
   const manifestEntry = optionalEntries.find((entry) => entry.filename === "manifest.json");
   const manifest = JSON.parse(await manifestEntry.getData(new TextWriter()));
   expect(manifest.paperSet.map((item) => item.name)).toEqual(["a4", "letter"]);

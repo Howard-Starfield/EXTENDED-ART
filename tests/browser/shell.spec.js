@@ -23,6 +23,10 @@ test("keeps the object and paper choices on the same centered axis", async ({ pa
   const paperChoices = await page.locator(".paper-options").boundingBox();
   expect(paperChoices).not.toBeNull();
   expect(Math.abs((objectChoices.x + objectChoices.width / 2) - (paperChoices.x + paperChoices.width / 2))).toBeLessThanOrEqual(2);
+  const a4Shape = await page.locator(".a4-paper").boundingBox();
+  const letterShape = await page.locator(".letter-paper").boundingBox();
+  expect(a4Shape.width / a4Shape.height).toBeCloseTo(210 / 297, 2);
+  expect(letterShape.width / letterShape.height).toBeCloseTo(215.9 / 279.4, 2);
 });
 
 test("keeps a narrow laptop viewport free of persistent horizontal overflow", async ({ page }) => {

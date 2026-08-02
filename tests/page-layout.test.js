@@ -42,4 +42,15 @@ describe("exact page layout contract", () => {
     expect(placement.xPt).toBeCloseTo((millimetersToPoints(215.9) - placement.widthPt) / 2, 8);
     expect(placement.yPt).toBeCloseTo((millimetersToPoints(279.4) - placement.heightPt) / 2, 8);
   });
+
+  it("changes only the sheet contract between A4 and Letter", () => {
+    for (const name of ["standard", "psa", "photo8x10"]) {
+      const a4 = createPageLayout(fallbackProfiles[name], fallbackPapers.a4);
+      const letter = createPageLayout(fallbackProfiles[name], fallbackPapers.letter);
+      expect(a4.pageSizeMm).toEqual([210, 297]);
+      expect(letter.pageSizeMm).toEqual([215.9, 279.4]);
+      expect(a4.placements[0].widthPt).toBeCloseTo(letter.placements[0].widthPt, 8);
+      expect(a4.placements[0].heightPt).toBeCloseTo(letter.placements[0].heightPt, 8);
+    }
+  });
 });
