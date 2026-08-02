@@ -5,7 +5,11 @@ await writeFile(
   "dist/server/index.js",
   `const worker = {
   async fetch(request, env) {
-    return env.ASSETS.fetch(request);
+    const response = await env.ASSETS.fetch(request);
+    if (response.status !== 404 || new URL(request.url).pathname !== "/") return response;
+    const indexUrl = new URL(request.url);
+    indexUrl.pathname = "/index.html";
+    return env.ASSETS.fetch(new Request(indexUrl, { method: "GET", headers: request.headers }));
   },
 };
 
