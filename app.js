@@ -83,9 +83,6 @@ function updateExportSummary() {
     $("#includeWithCardPdf").checked ? "with-card PDF" : "",
   ].filter(Boolean);
   $("#exportButtonCopy").textContent = selected.length
-    ? `${selected.join(", ")} · final PDF + ZIP engine next`
-    : "Cut-ready PDF + print guide included";
-  $("#exportButtonCopy").textContent = selected.length
     ? selected.join(", ") + " | cut-ready PDF + print guide included"
     : "Cut-ready PDF + print guide included";
   $("#exportButton").disabled = state.alignmentBusy

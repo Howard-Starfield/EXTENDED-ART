@@ -1,20 +1,22 @@
 # ExtendedArt Web delivery roadmap
 
-Status: Phase 3 in progress; Phase 2 real-image audit remains pending
+Status: Phase 3 implementation complete; release audit and Phase 2 real-image audit remain pending
 
 Gate record (2026-08-02): `npm.cmd run test` passes 47 tests, `npm.cmd run
 build` passes, and `npm.cmd run test:browser` passes all 3 browser tests,
 including worker-backed matching, progress locking, fallback messaging,
 deterministic master/piece geometry, PSA/frame/binder masks, quality-report
 diagnostics, synthetic matcher release gates, exact PDFs, deterministic ZIP
-assembly, default/optional package downloads, correction, and proof-download
-flows. The browser project has not been published or pushed.
+assembly, default/optional package downloads, optional PNG dimensions and print
+metadata, correction, and proof-download flows. The browser project has not
+been published or pushed.
 
 Repository checkpoints: commit 0755713 contains the Phase 1 browser-local
 workflow; b58e40e is the Phase 1 hardening checkpoint; 6dd498c contains the
-Phase 2 matcher, renderer, masks, quality report, and synthetic release gates.
-P2-08 remains open for permissioned real-image fixtures. No remote push or
-deployment has been performed.
+Phase 2 matcher, renderer, masks, quality report, and synthetic release gates;
+60bf8cf contains the Phase 3 browser PDF/ZIP package pipeline. P2-08 and P3-08
+remain open for real-image, viewer, memory, and physical-print validation. No
+remote push or deployment has been performed.
 
 Current launch scope ends with the browser-local print workflow and hosted
 static pilot. Image 2 generation is explicitly excluded from this roadmap.
@@ -796,7 +798,7 @@ correction. A timeout is not a low-confidence result.
 
 ## Phase 3 - PDF, print-guide, and ZIP parity
 
-Status: In progress; P3-01 through P3-07 implemented; P3-08 release audit pending
+Status: Implementation complete; P3-01 through P3-07 implemented; P3-08 release audit pending
 
 Goal: Produce the final customer ZIP entirely in the browser using the
 corrected physical-size, filename, optional-output, pagination, and guide
@@ -923,8 +925,8 @@ accurate cutting output.
       manifest.json from one normalized package model with SHA-256 entries.
 - [x] P3-07 Implement @zip.js/zip.js streaming assembly, deterministic entry
       order, progress, cancellation, memory estimation, and resource cleanup.
-- [ ] P3-08 Complete PDF parsing, archive, viewer, browser-memory, and physical
-      print tests before enabling Create print package.
+- [ ] P3-08 Complete the remaining PDF viewer, browser-memory, and physical
+      print tests before calling the local print-package pilot release-ready.
 
 ### Quality and testing checklist
 
@@ -946,7 +948,7 @@ accurate cutting output.
 - [ ] Open generated PDFs in at least two desktop PDF viewers.
 - [ ] Print one A4 sheet and one Letter sheet and measure the calibration square.
 - [ ] Test a large package on a low-memory browser profile.
-- [ ] Parse PNG optional outputs and assert dimensions, sRGB intent, and 11811
+- [x] Parse PNG optional outputs and assert dimensions, sRGB intent, and 11811
       pixels-per-meter metadata.
 
 ### Definition of done

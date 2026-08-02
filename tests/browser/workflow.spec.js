@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { Uint8ArrayReader, ZipReader } from "@zip.js/zip.js";
+import { Uint8ArrayReader, Uint8ArrayWriter, ZipReader } from "@zip.js/zip.js";
 import { readFileSync } from "node:fs";
 import { deflateSync } from "node:zlib";
 
@@ -183,5 +183,19 @@ test("auto-aligns after both required images decode", async ({ page }) => {
   expect(optionalNames.some((name) => name.endsWith("_full_art_reference.pdf"))).toBe(true);
   expect(optionalNames.some((name) => name.endsWith("_with_card_reference.pdf"))).toBe(true);
   expect(optionalNames.filter((name) => name.startsWith("pieces/")).length).toBe(8);
+  const masterEntry = optionalEntries.find((entry) => entry.filename.endsWith("_master_300dpi.png"));
+  const masterBytes = Buffer.from(await masterEntry.getData(new Uint8ArrayWriter()));
+  expect(masterBytes.readUInt32BE(16)).toBe(2232);
+  expect(masterBytes.readUInt32BE(20)).toBe(3118);
+  const masterPhys = pngChunkData(masterBytes, "pHYs");
+  expect(masterPhys.readUInt32BE(0)).toBe(11811);
+  expect(masterPhys.readUInt32BE(4)).toBe(11811);
+  expect(masterPhys[8]).toBe(1);
+  const masterSrgb = pngChunkData(masterBytes, "sRGB");
+  expect(masterSrgb[0]).toBe(0);
+  const pieceEntry = optionalEntries.find((entry) => entry.filename.startsWith("pieces/"));
+  const pieceBytes = Buffer.from(await pieceEntry.getData(new Uint8ArrayWriter()));
+  expect(pieceBytes.readUInt32BE(16)).toBe(744);
+  expect(pieceBytes.readUInt32BE(20)).toBe(1039);
   await optionalReader.close();
 });

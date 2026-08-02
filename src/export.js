@@ -1,4 +1,4 @@
-import { cardPhysicalMm, psaLabelBox } from "./profiles.js";
+import { psaLabelBox } from "./profiles.js";
 import { getOutputMaskGeometry } from "./output-geometry.js";
 import { createPageLayout } from "./page-layout.js";
 import {
@@ -20,7 +20,6 @@ function canvasBlob(canvas) {
     canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error("The output image could not be encoded.")), "image/png");
   });
 }
-
 async function canvasPng(canvas) {
   return withPrintMetadata(await canvasBlob(canvas), 300);
 }
@@ -211,4 +210,3 @@ export async function createBrowserPrintPackage({
     memory,
   };
 }
-
