@@ -111,11 +111,11 @@ test("auto-aligns after both required images decode", async ({ page }) => {
   await expect(page.locator("#alignmentProgress")).toBeHidden();
   await expect(page.locator("#progressJob")).toHaveText(/JOB \d{4}/);
   await expect(page.locator("#progressBar")).toHaveCSS("width", "100%");
-  await expect(page.locator("#autoAlignStatus")).toHaveAttribute(
-    "data-alignment-status",
-    "CENTERED_NOT_MATCHED",
-  );
-  await expect(page.locator("#autoAlignStatus")).toContainText("Centered only");
+    await expect(page.locator("#autoAlignStatus")).toHaveAttribute(
+      "data-alignment-status",
+      "NO_RELIABLE_MATCH",
+    );
+    await expect(page.locator("#autoAlignStatus")).toContainText("No reliable automatic match");
   await expect(page.locator("#includeCard")).not.toBeChecked();
 
   await page.locator("#canvasShell").focus();

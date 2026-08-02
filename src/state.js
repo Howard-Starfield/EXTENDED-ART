@@ -28,6 +28,8 @@ export function createInitialState(profiles, papers) {
     alignmentJobId: 0,
     lastCompletedJobId: 0,
     baseline: null,
+    matcherDiagnostics: null,
+    alignmentRequestId: 0,
     focusBeforeAlignment: null,
     setupStep: "product",
     quality: { warnings: [] },

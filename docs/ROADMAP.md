@@ -1,14 +1,17 @@
 # ExtendedArt Web delivery roadmap
 
-Status: Phase 1 complete; Phase 2 pending
+Status: Phase 2 in progress
 
-Gate record (2026-08-02): `npm.cmd run test` passes 14 tests, `npm.cmd run
-build` passes, and `npm.cmd run test:browser` passes the setup, responsive,
-locked-alignment, input, correction, and proof-download flows. The browser
-project has not been published or pushed.
+Gate record (2026-08-02): `npm.cmd run test` passes 20 tests, `npm.cmd run
+build` passes, and `npm.cmd run test:browser` passes all 3 browser tests,
+including worker-backed matching, progress locking, fallback messaging,
+correction, and proof-download flows. The browser project has not been
+published or pushed.
 
 Repository checkpoint: commit 0755713 contains the Phase 1 browser-local
-workflow and documentation. No remote push or deployment has been performed.
+workflow; the Phase 1 hardening checkpoint is b58e40e. The Phase 2 matcher
+checkpoint will be recorded after this gate is committed. No remote push or
+deployment has been performed.
 
 Current launch scope ends with the browser-local print workflow and hosted
 static pilot. Image 2 generation is explicitly excluded from this roadmap.
@@ -635,7 +638,8 @@ small output that proves the scene model and preview are connected.
 
 ## Phase 2 - Deterministic image pipeline and reference matching
 
-Status: Pending
+Status: In progress; P2-01 through P2-04 are implemented in the current
+working checkpoint
 
 Goal: Replace the center-fit placeholder with a real, explainable local image
 pipeline that can detect the card reference and render the exact master and
@@ -732,13 +736,13 @@ correction. A timeout is not a low-confidence result.
 
 ### Ordered implementation checklist
 
-- [ ] P2-01 Add worker-side luminance, contrast normalization, and Sobel edge
+- [x] P2-01 Add worker-side luminance, contrast normalization, and Sobel edge
       preprocessing with versioned parameters.
-- [ ] P2-02 Implement bounded coarse transform search and uncovered-edge
+- [x] P2-02 Implement bounded coarse transform search and uncovered-edge
       rejection from the center-fit baseline.
-- [ ] P2-03 Implement five-candidate refinement, result diagnostics, and the
+- [x] P2-03 Implement five-candidate refinement, result diagnostics, and the
       versioned 0.78 score / 0.06 margin auto-apply gates.
-- [ ] P2-04 Connect match, uncertain, cancel, timeout, failure, and retry states
+- [x] P2-04 Connect match, uncertain, cancel, timeout, failure, and retry states
       to the progress UI without allowing stale worker results.
 - [ ] P2-05 Implement exact master rendering, rounded-edge slicing, canonical
       position ids, and the eight-piece binder print list.
@@ -761,6 +765,7 @@ correction. A timeout is not a low-confidence result.
 - [ ] Test source images below, equal to, and above the target pixel count.
 - [ ] Test cancellation while decoding and while matching.
 - [ ] Test multiple consecutive jobs for memory leaks.
+- [ ] Verify rounded corner alpha masks preserve piece dimensions.
 - [ ] Record the matcher thresholds and fixture scores in a versioned report.
 - [ ] On synthetic translation/scale fixtures, require median transformed-card
       corner error of 4 master pixels or less and maximum error of 10 pixels.
