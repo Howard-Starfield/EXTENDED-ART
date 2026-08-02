@@ -3,6 +3,7 @@ import {
   cardPhysicalMm,
   fallbackPapers,
   fallbackProfiles,
+  PROFILE_VERSION,
   paperFit,
   pixelPair,
   profileSummary,
@@ -11,6 +12,7 @@ import {
 import { createInitialState, imageSize, releaseImage } from "./src/state.js";
 import { fileSummary, readImage, replacePreviewUrl } from "./src/image-io.js";
 import { classifyEffectiveDpi } from "./src/quality.js";
+import { buildQualityReport } from "./src/quality-report.js";
 import { CENTER_FIT_ALIGNMENT } from "./src/alignment.js";
 import { createMatcherJobRunner } from "./src/matcher.js";
 import { drawAlignmentScene, drawArtworkProof } from "./src/renderer.js";
@@ -301,6 +303,27 @@ function applyReferenceTransform(result) {
   $("#zoomValue").textContent = `${Math.round(result.zoom * 100)}%`;
 }
 
+function updateQualityReport(alignment = state.matcherDiagnostics) {
+  const profile = activeProfile();
+  const paper = activePaper();
+  state.qualityReport = buildQualityReport({
+    profile,
+    paper,
+    artDimensions: state.artDimensions,
+    cardDimensions: state.cardDimensions,
+    alignment,
+    labelBox: profile.name === "psa" ? currentPsaLabelBox() : null,
+    cornerRadiusMm: state.cornerRadiusMm,
+    exportOptions: {
+      includeCard: includeCardRequested(),
+      includePieces: $("#includePieces").checked,
+      includeMaster: $("#includeMaster").checked,
+      includeFullArtPdf: $("#includeFullArtPdf").checked,
+      includeWithCardPdf: $("#includeWithCardPdf").checked,
+    },
+  });
+}
+
 function setProgressVisible(visible) {
   $("#alignmentProgress").hidden = !visible;
   document.body.classList.toggle("alignment-busy", visible);
@@ -361,6 +384,7 @@ const matcherRunner = createMatcherJobRunner({
     state.lastCompletedJobId = result.jobId;
     state.alignmentStatus = result.status;
     state.matcherDiagnostics = result;
+    updateQualityReport(result);
     $("#autoAlignStatus").dataset.alignmentStatus = result.status;
     $("#autoAlignButton").classList.remove("is-loading");
     if (result.accepted) applyReferenceTransform(result);
@@ -402,6 +426,7 @@ async function startAlignment(reason = "both images ready") {
   state.alignmentBusy = true;
   state.alignmentStatus = "RUNNING";
   state.matcherDiagnostics = null;
+  state.qualityReport = null;
   state.alignmentJobId = 0;
   applyCenterFit();
   $("#autoAlignStatus").hidden = true;
@@ -426,7 +451,7 @@ async function startAlignment(reason = "both images ready") {
       cardImage: matchCard,
       profile: activeProfile(),
       baseline: state.baseline,
-      profileVersion: "phase2-profiles-1",
+      profileVersion: PROFILE_VERSION,
     });
     state.alignmentJobId = jobId;
     showAlignmentProgress({ jobId, label: "Starting reference matcher", progress: 0 });
@@ -469,6 +494,7 @@ async function loadFile(kind, file) {
     state.lastCompletedJobId = 0;
     state.baseline = null;
     state.matcherDiagnostics = null;
+    state.qualityReport = null;
     setPreview(kind, file);
     $(`#${kind}Meta`).textContent = fileSummary(file, decoded);
     $(`#${kind}Drop`).classList.add("loaded");

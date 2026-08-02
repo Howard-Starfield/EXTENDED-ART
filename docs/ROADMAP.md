@@ -2,11 +2,12 @@
 
 Status: Phase 2 in progress
 
-Gate record (2026-08-02): `npm.cmd run test` passes 29 tests, `npm.cmd run
+Gate record (2026-08-02): `npm.cmd run test` passes 31 tests, `npm.cmd run
 build` passes, and `npm.cmd run test:browser` passes all 3 browser tests,
 including worker-backed matching, progress locking, fallback messaging,
-deterministic master/piece geometry, PSA/frame/binder masks, correction, and
-proof-download flows. The browser project has not been published or pushed.
+deterministic master/piece geometry, PSA/frame/binder masks, quality-report
+diagnostics, correction, and proof-download flows. The browser project has not
+been published or pushed.
 
 Repository checkpoint: commit 0755713 contains the Phase 1 browser-local
 workflow; the Phase 1 hardening checkpoint is b58e40e. The Phase 2 matcher
@@ -638,7 +639,7 @@ small output that proves the scene model and preview are connected.
 
 ## Phase 2 - Deterministic image pipeline and reference matching
 
-Status: In progress; P2-01 through P2-06 are implemented in the current
+Status: In progress; P2-01 through P2-07 are implemented in the current
 working checkpoint
 
 Goal: Replace the center-fit placeholder with a real, explainable local image
@@ -748,7 +749,7 @@ correction. A timeout is not a low-confidence result.
       position ids, and the eight-piece binder print list.
 - [x] P2-06 Implement PSA, 8x10, and binder chamber masks plus separate outer
       and internal preview-guide geometry.
-- [ ] P2-07 Implement the quality report, effective-DPI calculations, alignment
+- [x] P2-07 Implement the quality report, effective-DPI calculations, alignment
       diagnostics, and version stamps.
 - [ ] P2-08 Complete the synthetic and real-example fixture reports and pass the
       false-positive and geometric-error release gates.

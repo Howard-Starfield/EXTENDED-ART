@@ -1,6 +1,9 @@
+export const PROFILE_VERSION = "phase2-profiles-1";
+
 export const fallbackProfiles = {
   standard: {
     name: "standard",
+    version: PROFILE_VERSION,
     label: "Standard 3×3 Binder",
     grid: [3, 3],
     piece_count: 8,
@@ -14,6 +17,7 @@ export const fallbackProfiles = {
   },
   vaultx: {
     name: "vaultx",
+    version: PROFILE_VERSION,
     label: "Vault Binder",
     grid: [3, 3],
     piece_count: 8,
@@ -27,6 +31,7 @@ export const fallbackProfiles = {
   },
   psa: {
     name: "psa",
+    version: PROFILE_VERSION,
     label: "PSA Slab",
     grid: [1, 1],
     piece_count: 1,
@@ -41,6 +46,7 @@ export const fallbackProfiles = {
   },
   photo8x10: {
     name: "photo8x10",
+    version: PROFILE_VERSION,
     label: "8×10 Photo Frame",
     grid: [1, 1],
     piece_count: 1,
