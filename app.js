@@ -72,6 +72,7 @@ function updateSetupSummary() {
   $("#setupSummaryName").textContent = profile.label;
   $("#setupSummaryPixels").textContent = `${pixelPair(profile.master_px)} px`;
   $("#setupSummarySize").textContent = `${cleanMeasure(profile.master_mm[0])} × ${cleanMeasure(profile.master_mm[1])} mm`;
+  $("#setupSummarySheet").textContent = `${paper.label} / ${cleanMeasure(paper.size_mm[0])} × ${cleanMeasure(paper.size_mm[1])} mm`;
   $("#setupSummaryPackage").textContent = profileSummary(profile, paper);
 }
 
@@ -105,7 +106,7 @@ function updatePaperTools() {
       : layout.warnings.length
         ? "Exact size · margin note"
         : "Exact size";
-    const dimensions = paper.size_mm.map(cleanMeasure).join("×");
+    const dimensions = `${paper.size_mm.map(cleanMeasure).join(" × ")} mm`;
     const button = $(buttonSelector);
     button.classList.toggle("active", selected);
     button.classList.toggle("scaled", layout.pageCount > 1 || layout.warnings.length > 0);
@@ -152,7 +153,7 @@ function updateStudioContract() {
   $("#masterContract").textContent = pixelPair(profile.master_px);
   $("#pieceContractLabel").textContent = profile.piece_count === 1 ? "Output" : "Insert";
   $("#pieceContract").textContent = pixelPair(profile.insert_px);
-  $("#paperContract").textContent = `${paper.label} / 300 DPI`;
+  $("#paperContract").textContent = `${paper.label} / ${paper.size_mm.map(cleanMeasure).join(" × ")} mm`;
   $("#includeCardHelp").textContent = "Off by default to save ink; the cut-ready package leaves the center/card chamber empty.";
   $("#cutReadyOutputHelp").textContent = profile.name === "psa"
     ? "White PSA label + card chambers with dotted guides"

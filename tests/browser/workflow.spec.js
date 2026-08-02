@@ -83,6 +83,9 @@ test("auto-aligns after both required images decode", async ({ page }) => {
   await page.locator("label.paper-card").first().click();
   await page.getByRole("button", { name: "Open alignment studio" }).click();
   await expect(page.locator("#autoAlignButton")).toBeDisabled();
+  await expect(page.locator("#paperContract")).toHaveText("A4 / 210 × 297 mm");
+  await expect(page.locator("#a4Fit")).toContainText("mm");
+  await expect(page.locator("#letterFit")).toContainText("mm");
   const a4Icon = await page.locator(".a4-icon").boundingBox();
   const letterIcon = await page.locator(".letter-icon").boundingBox();
   expect(a4Icon.width / a4Icon.height).toBeCloseTo(210 / 297, 2);
@@ -120,8 +123,12 @@ test("auto-aligns after both required images decode", async ({ page }) => {
       "data-alignment-status",
       "NO_RELIABLE_MATCH",
     );
-    await expect(page.locator("#autoAlignStatus")).toContainText("No reliable automatic match");
+  await expect(page.locator("#autoAlignStatus")).toContainText("No reliable automatic match");
   await expect(page.locator("#includeCard")).not.toBeChecked();
+  await page.locator("#letterPaperTool").click({ force: true });
+  await expect(page.locator("#paperContract")).toHaveText("US Letter / 215.9 × 279.4 mm");
+  await page.locator("#a4PaperTool").click({ force: true });
+  await expect(page.locator("#paperContract")).toHaveText("A4 / 210 × 297 mm");
 
   await page.locator("#canvasShell").focus();
   await page.locator("#canvasShell").press("ArrowRight");

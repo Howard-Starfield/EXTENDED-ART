@@ -20,6 +20,9 @@ test("keeps the object and paper choices on the same centered axis", async ({ pa
 
   await page.locator("label.mode-card").first().click();
   await expect(page.locator(".paper-options")).toBeVisible();
+  await expect(page.locator("#setupSummarySheet")).toHaveText("A4 / 210 × 297 mm");
+  await page.locator("label.paper-card").nth(1).click();
+  await expect(page.locator("#setupSummarySheet")).toHaveText("US Letter / 215.9 × 279.4 mm");
   const paperChoices = await page.locator(".paper-options").boundingBox();
   expect(paperChoices).not.toBeNull();
   expect(Math.abs((objectChoices.x + objectChoices.width / 2) - (paperChoices.x + paperChoices.width / 2))).toBeLessThanOrEqual(2);
