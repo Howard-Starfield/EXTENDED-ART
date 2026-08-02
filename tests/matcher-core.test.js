@@ -4,6 +4,7 @@ import {
   correlation,
   coverGeometry,
   coversMaster,
+  periodicityScore,
   searchTransforms,
   sobelMagnitude,
 } from "../src/matcher-core.js";
@@ -52,6 +53,14 @@ describe("deterministic reference matcher", () => {
     const edges = sobelMagnitude(plane, 3, 3);
     expect(edges[4]).not.toBe(0);
     expect(correlation(edges, edges)).toBeCloseTo(1, 6);
+  });
+
+  it("detects an exactly repeated card texture as ambiguous", () => {
+    const repeated = new Float32Array(48 * 60);
+    for (let y = 0; y < 60; y += 1) {
+      for (let x = 0; x < 48; x += 1) repeated[y * 48 + x] = (x % 8 < 4 ? 30 : 220);
+    }
+    expect(periodicityScore(repeated, 48, 60)).toBeGreaterThan(0.995);
   });
 
   it("recovers a known zoom and translation when the scene contains the card", () => {

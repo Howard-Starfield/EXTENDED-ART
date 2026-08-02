@@ -5,7 +5,7 @@ import { buildQualityReport } from "../src/quality-report.js";
 const matched = {
   status: "MATCHED",
   accepted: true,
-  matcherVersion: "phase2.0",
+  matcherVersion: "phase2.1",
   profileVersion: "phase2-profiles-1",
   bestScore: 0.91,
   secondScore: 0.72,
@@ -30,7 +30,7 @@ describe("quality report contract", () => {
     expect(report.overallStatus).toBe("PASS");
     expect(report.reportVersion).toBe("phase2.0");
     expect(report.profileVersion).toBe("phase2-profiles-1");
-    expect(report.alignment.matcherVersion).toBe("phase2.0");
+    expect(report.alignment.matcherVersion).toBe("phase2.1");
     expect(report.target.masterPx).toEqual([2232, 3118]);
     expect(report.cutouts[0].id).toBe("CENTER_CARD");
   });
@@ -42,7 +42,7 @@ describe("quality report contract", () => {
       paper: fallbackPapers.letter,
       artDimensions: { width: 300, height: 500 },
       cardDimensions: { width: 630, height: 880 },
-      alignment: { status: "NO_RELIABLE_MATCH", accepted: false, matcherVersion: "phase2.0" },
+      alignment: { status: "NO_RELIABLE_MATCH", accepted: false, matcherVersion: "phase2.1" },
       labelBox: psaLabelBox(profile, 70, 20),
     });
 

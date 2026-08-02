@@ -2,12 +2,12 @@
 
 Status: Phase 2 in progress
 
-Gate record (2026-08-02): `npm.cmd run test` passes 31 tests, `npm.cmd run
+Gate record (2026-08-02): `npm.cmd run test` passes 34 tests, `npm.cmd run
 build` passes, and `npm.cmd run test:browser` passes all 3 browser tests,
 including worker-backed matching, progress locking, fallback messaging,
 deterministic master/piece geometry, PSA/frame/binder masks, quality-report
-diagnostics, correction, and proof-download flows. The browser project has not
-been published or pushed.
+diagnostics, synthetic matcher release gates, correction, and proof-download
+flows. The browser project has not been published or pushed.
 
 Repository checkpoint: commit 0755713 contains the Phase 1 browser-local
 workflow; the Phase 1 hardening checkpoint is b58e40e. The Phase 2 matcher
@@ -687,11 +687,16 @@ The first matcher should be conservative and explainable:
 8. Initial auto-apply gates are best score at least 0.78 and score margin at
    least 0.06. Keep the values in versioned profile data. Change them only with
    a fixture report that preserves the negative-case release gates.
-9. If either gate fails, retain the completed center-fit baseline and show
+9. Independently reject a reference whose comparison texture has a periodicity
+   score of at least 0.995. This prevents a repeated stripe or tile pattern
+   from being treated as a unique card match; report the diagnostic instead of
+   changing the calibrated score and margin gates.
+10. If either score gate or the periodicity gate fails, retain the completed
+   center-fit baseline and show
    "No reliable automatic match - inspect and align manually." Do not apply a
    weak candidate.
-10. Preserve manual corrections as deltas from the accepted baseline. Paper
-    changes and final renders must not silently re-run the matcher.
+11. Preserve manual corrections as deltas from the accepted baseline. Paper
+   changes and final renders must not silently re-run the matcher.
 
 The matcher uses the card chamber for all four profiles. PSA label dimensions
 affect only the output mask; there is no PSA-label image upload or label matcher
@@ -756,7 +761,7 @@ correction. A timeout is not a low-confidence result.
 
 ### Quality and testing checklist
 
-- [ ] Build a synthetic fixture suite with known translations, scale changes,
+- [x] Build a synthetic fixture suite with known translations, scale changes,
       repeated colors, low contrast, and no-card scenes.
 - [ ] Generate reference JSON from the Python processor for every profile.
 - [ ] Compare browser master and piece dimensions to the reference contract.
@@ -767,10 +772,10 @@ correction. A timeout is not a low-confidence result.
 - [ ] Test cancellation while decoding and while matching.
 - [ ] Test multiple consecutive jobs for memory leaks.
 - [x] Verify rounded corner alpha masks preserve piece dimensions.
-- [ ] Record the matcher thresholds and fixture scores in a versioned report.
-- [ ] On synthetic translation/scale fixtures, require median transformed-card
+- [x] Record the matcher thresholds and fixture scores in a versioned report.
+- [x] On synthetic translation/scale fixtures, require median transformed-card
       corner error of 4 master pixels or less and maximum error of 10 pixels.
-- [ ] Require zero high-confidence auto-applies across the versioned no-card
+- [x] Require zero high-confidence auto-applies across the versioned no-card
       and repeated-pattern negative fixtures before release.
 - [ ] Measure three supplied real examples separately and document required
       manual correction without using them to hide synthetic regressions.

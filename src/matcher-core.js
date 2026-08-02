@@ -1,4 +1,4 @@
-export const MATCHER_VERSION = "phase2.0";
+export const MATCHER_VERSION = "phase2.1";
 
 export const MATCH_GATES = Object.freeze({
   minimumScore: 0.78,
@@ -84,6 +84,31 @@ export function correlation(left, right) {
   }
   const denominator = Math.sqrt(leftEnergy * rightEnergy);
   return denominator < EPSILON ? 0 : numerator / denominator;
+}
+
+function shiftedCorrelation(source, width, height, offsetX, offsetY) {
+  const left = [];
+  const right = [];
+  for (let y = 0; y < height - offsetY; y += 1) {
+    for (let x = 0; x < width - offsetX; x += 1) {
+      left.push(source[y * width + x]);
+      right.push(source[(y + offsetY) * width + x + offsetX]);
+    }
+  }
+  return correlation(standardize(left), standardize(right));
+}
+
+export function periodicityScore(source, width, height) {
+  let best = 0;
+  const maxX = Math.floor(width * 0.45);
+  const maxY = Math.floor(height * 0.45);
+  for (let offset = 2; offset <= maxX; offset += 1) {
+    best = Math.max(best, shiftedCorrelation(source, width, height, offset, 0));
+  }
+  for (let offset = 2; offset <= maxY; offset += 1) {
+    best = Math.max(best, shiftedCorrelation(source, width, height, 0, offset));
+  }
+  return best;
 }
 
 export function coverGeometry(artWidth, artHeight, masterWidth, masterHeight, transform) {
@@ -194,6 +219,7 @@ export function searchTransforms({
   const cardAspect = ((cardBox[2] - cardBox[0]) * masterWidth) / ((cardBox[3] - cardBox[1]) * masterHeight);
   const comparisonWidth = Math.max(48, Math.round(comparisonHeight * cardAspect));
   const cardResized = resizeGray(card, cardWidth, cardHeight, comparisonWidth, comparisonHeight);
+  const cardPeriodicity = periodicityScore(cardResized, comparisonWidth, comparisonHeight);
   const input = {
     art,
     artWidth,
@@ -248,7 +274,13 @@ export function searchTransforms({
   const second = results.find((candidate) => transformKey(candidate) !== transformKey(best));
   const secondScore = second?.score ?? 0;
   const margin = best.score - secondScore;
-  const accepted = best.score >= MATCH_GATES.minimumScore && margin >= MATCH_GATES.minimumMargin;
+  // A genuinely repeated reference can produce a high score at one phase while
+  // still being ambiguous. Keep this conservative gate separate from the
+  // calibrated score and margin thresholds so it is visible in diagnostics.
+  const repeatedPattern = cardPeriodicity >= 0.995;
+  const accepted = !repeatedPattern
+    && best.score >= MATCH_GATES.minimumScore
+    && margin >= MATCH_GATES.minimumMargin;
   onProgress?.({ stage: "Preparing match result", completedWork: 1, totalWork: 1, progress: 100 });
   return {
     matcherVersion: MATCHER_VERSION,
@@ -260,6 +292,8 @@ export function searchTransforms({
     bestScore: best.score,
     secondScore,
     scoreMargin: margin,
+    periodicityScore: cardPeriodicity,
+    repeatedPattern,
     comparisonSize: [comparisonWidth, comparisonHeight],
     elapsedMs: Date.now() - startedAt,
     candidateCount: results.length,
