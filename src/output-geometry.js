@@ -41,13 +41,16 @@ export function internalGuideRect(rect, options = {}) {
   };
 }
 
-export function getCutoutGeometry(profile, { labelBox = profile.label_box, cornerRadiusMm = 3 } = {}) {
+export function getCutoutGeometry(
+  profile,
+  { labelBox = profile.label_box, cornerRadiusMm = profile.recommended_corner_radius_mm || 0 } = {},
+) {
   const cutouts = [];
   if (profile.name === "psa" && labelBox) {
-    cutouts.push({ id: "PSA_LABEL", label: "PSA LABEL CUTOUT", box: labelBox, radiusMm: 1 });
+    cutouts.push({ id: "PSA_LABEL", label: "PSA LABEL CUTOUT", box: labelBox, radiusMm: cornerRadiusMm });
   }
   if (profile.name === "psa") {
-    cutouts.push({ id: "CARD", label: "CARD CUTOUT", box: profile.card_box, radiusMm: 3 });
+    cutouts.push({ id: "CARD", label: "CARD CUTOUT", box: profile.card_box, radiusMm: cornerRadiusMm });
   } else if (profile.name === "photo8x10") {
     cutouts.push({ id: "CARD", label: "CARD CHAMBER", box: profile.card_box, radiusMm: cornerRadiusMm });
   } else if (profile.grid?.[0] === 3 && profile.grid?.[1] === 3) {

@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { PDFDocument } from "pdf-lib";
 import { fallbackPapers, fallbackProfiles } from "../src/profiles.js";
-import { createCutReadyPdf, createPrintGuidePdf, createWithCardReferencePdf } from "../src/pdf-export.js";
+import { getCutoutGeometry } from "../src/output-geometry.js";
+import { createCutReadyPdf, createPrintGuidePdf, createWithCardReferencePdf, cutoutRect, svgPathOrigin } from "../src/pdf-export.js";
 import { createPageLayout, millimetersToPoints } from "../src/page-layout.js";
 
 function tinyPng() {
@@ -45,6 +46,16 @@ describe("pdf export adapter", () => {
       const sources = new Map(getPageLayoutIds(profile, paper).map((id) => [id, tinyPng()]));
       const bytes = await createCutReadyPdf({ profile, paper, pieceSources: sources });
       expect((await PDFDocument.load(bytes)).getPageCount()).toBe(1);
+    }
+  });
+
+  it("anchors SVG cutout paths at the physical top edge", () => {
+    for (const name of ["psa", "photo8x10"]) {
+      const profile = fallbackProfiles[name];
+      const placement = createPageLayout(profile, fallbackPapers.letter).placements[0];
+      const cutout = getCutoutGeometry(profile)[name === "psa" ? 1 : 0];
+      const rect = cutoutRect(profile, placement, cutout);
+      expect(svgPathOrigin(rect)).toEqual({ x: rect.x, y: rect.y + rect.height });
     }
   });
 

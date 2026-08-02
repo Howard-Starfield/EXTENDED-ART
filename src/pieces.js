@@ -89,7 +89,13 @@ export function applyRoundedAlphaMask(context, width, height, radiusPx) {
   context.restore();
 }
 
-export function applyCutoutMasks(context, width, height, profile, { labelBox = profile.label_box, cornerRadiusMm = 3 } = {}) {
+export function applyCutoutMasks(
+  context,
+  width,
+  height,
+  profile,
+  { labelBox = profile.label_box, cornerRadiusMm = profile.recommended_corner_radius_mm || 0 } = {},
+) {
   const cutouts = getOutputMaskGeometry(profile, { labelBox, cornerRadiusMm });
   for (const cutout of cutouts) {
     const scaleX = width / profile.master_px[0];

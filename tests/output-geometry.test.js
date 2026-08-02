@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { fallbackProfiles, psaLabelBox } from "../src/profiles.js";
 import {
+  getCutoutGeometry,
   getOutputMaskGeometry,
   guideOffsetPx,
   internalGuideRect,
@@ -35,6 +36,16 @@ describe("cutout and guide geometry", () => {
     expect(getOutputMaskGeometry(fallbackProfiles.photo8x10)).toHaveLength(1);
     expect(getOutputMaskGeometry(fallbackProfiles.photo8x10)[0].id).toBe("CARD");
     expect(getOutputMaskGeometry(fallbackProfiles.standard)[0].id).toBe("CENTER_CARD");
+  });
+
+  it("uses the selected roundness for every PSA opening and the frame chamber", () => {
+    const psa = getCutoutGeometry(fallbackProfiles.psa, {
+      labelBox: psaLabelBox(fallbackProfiles.psa, 69.85, 21.59),
+      cornerRadiusMm: 4.5,
+    });
+    expect(psa.map((item) => item.radiusMm)).toEqual([4.5, 4.5]);
+    expect(getOutputMaskGeometry(fallbackProfiles.photo8x10)[0].radiusMm).toBe(0);
+    expect(getOutputMaskGeometry(fallbackProfiles.photo8x10, { cornerRadiusMm: 5 })[0].radiusMm).toBe(5);
   });
 
   it("keeps outer guides outside and internal guides inside their retained boundaries", () => {

@@ -39,7 +39,7 @@ function roundedRectPath(width, height, radius) {
   ].join(" ");
 }
 
-function cutoutRect(profile, placement, cutout) {
+export function cutoutRect(profile, placement, cutout) {
   const masterWidthPt = millimetersToPoints(profile.master_mm[0]);
   const masterHeightPt = millimetersToPoints(profile.master_mm[1]);
   const width = cutout.box[2] - cutout.box[0];
@@ -53,12 +53,23 @@ function cutoutRect(profile, placement, cutout) {
   };
 }
 
-function drawOuterGuide(page, placement) {
-  page.drawRectangle({
+export function svgPathOrigin(rect) {
+  // pdf-lib's SVG path y-coordinate is the path's top edge. Keep this
+  // conversion in one place so paths align with the embedded PNG bounds,
+  // whose y-coordinate is the physical bottom edge.
+  return { x: rect.x, y: rect.y + rect.height };
+}
+
+function drawOuterGuide(page, placement, cornerRadiusMm) {
+  const rect = {
     x: placement.xPt - GUIDE_OFFSET_PT,
     y: placement.yPt - GUIDE_OFFSET_PT,
     width: placement.widthPt + GUIDE_OFFSET_PT * 2,
     height: placement.heightPt + GUIDE_OFFSET_PT * 2,
+    radius: millimetersToPoints(cornerRadiusMm) + GUIDE_OFFSET_PT,
+  };
+  page.drawSvgPath(roundedRectPath(rect.width, rect.height, rect.radius), {
+    ...svgPathOrigin(rect),
     borderWidth: GUIDE_STROKE_PT,
     borderColor: GUIDE_COLOR,
     borderDashArray: GUIDE_DASH,
@@ -66,25 +77,40 @@ function drawOuterGuide(page, placement) {
   });
 }
 
-function drawCutouts(page, profile, placement, { labelBox = profile.label_box, cornerRadiusMm = 3, fillCard = true } = {}) {
+function drawCutouts(
+  page,
+  profile,
+  placement,
+  {
+    labelBox = profile.label_box,
+    cornerRadiusMm = profile.recommended_corner_radius_mm || 0,
+    fillCutouts = false,
+    fillCard = false,
+  } = {},
+) {
   if (profile.grid[0] !== 1 || profile.grid[1] !== 1) return;
   const cutouts = getCutoutGeometry(profile, { labelBox, cornerRadiusMm });
   for (const cutout of cutouts) {
     const rect = cutoutRect(profile, placement, cutout);
-    if (fillCard || cutout.id !== "CARD") {
+    if (fillCutouts && (fillCard || cutout.id !== "CARD")) {
       page.drawSvgPath(roundedRectPath(rect.width, rect.height, rect.radius), {
-        x: rect.x,
-        y: rect.y,
+        ...svgPathOrigin(rect),
         color: rgb(1, 1, 1),
       });
     }
-    page.drawSvgPath(roundedRectPath(
-      Math.max(0, rect.width - GUIDE_OFFSET_PT * 2),
-      Math.max(0, rect.height - GUIDE_OFFSET_PT * 2),
-      Math.max(0, rect.radius - GUIDE_OFFSET_PT),
-    ), {
+    const guide = {
       x: rect.x + GUIDE_OFFSET_PT,
       y: rect.y + GUIDE_OFFSET_PT,
+      width: Math.max(0, rect.width - GUIDE_OFFSET_PT * 2),
+      height: Math.max(0, rect.height - GUIDE_OFFSET_PT * 2),
+      radius: Math.max(0, rect.radius - GUIDE_OFFSET_PT),
+    };
+    page.drawSvgPath(roundedRectPath(
+      guide.width,
+      guide.height,
+      guide.radius,
+    ), {
+      ...svgPathOrigin(guide),
       borderWidth: GUIDE_STROKE_PT,
       borderColor: cutout.id === "PSA_LABEL" ? rgb(0.95, 0.26, 0.17) : GUIDE_COLOR,
       borderDashArray: GUIDE_DASH,
@@ -129,8 +155,8 @@ export async function createCutReadyPdf({
         width: placement.widthPt,
         height: placement.heightPt,
       });
-      drawCutouts(page, profile, placement, { labelBox, cornerRadiusMm, fillCard: false });
-      drawOuterGuide(page, placement);
+      drawCutouts(page, profile, placement, { labelBox, cornerRadiusMm });
+      drawOuterGuide(page, placement, cornerRadiusMm);
     }
   }
   return new Uint8Array(await pdfDoc.save());
@@ -172,8 +198,8 @@ export async function createWithCardReferencePdf({
           page.drawImage(cardImage, { x: rect.x, y: rect.y, width: rect.width, height: rect.height });
         }
       }
-      drawCutouts(page, profile, placement, { labelBox, cornerRadiusMm });
-      drawOuterGuide(page, placement);
+      drawCutouts(page, profile, placement, { labelBox, cornerRadiusMm, fillCutouts: true });
+      drawOuterGuide(page, placement, cornerRadiusMm);
     }
   }
   return new Uint8Array(await pdfDoc.save());
