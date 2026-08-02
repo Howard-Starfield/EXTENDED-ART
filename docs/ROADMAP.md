@@ -7,7 +7,7 @@ build` passes, and `npm.cmd run test:browser` passes the setup-gate and
 automatic-upload/proof-download flows. The browser project has not been
 published or pushed.
 
-Repository checkpoint: commit 66f2abe contains the Phase 1 browser-local
+Repository checkpoint: commit 0755713 contains the Phase 1 browser-local
 workflow and documentation. No remote push or deployment has been performed.
 
 Current launch scope ends with the browser-local print workflow and hosted
