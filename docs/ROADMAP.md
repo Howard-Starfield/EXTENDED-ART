@@ -1,11 +1,11 @@
 # ExtendedArt Web delivery roadmap
 
-Status: Phase 1 core implementation complete; UX hardening checklist remains
+Status: Phase 1 complete; Phase 2 pending
 
-Gate record (2026-08-01): `npm.cmd run test` passes 13 tests, `npm.cmd run
-build` passes, and `npm.cmd run test:browser` passes the setup-gate and
-automatic-upload/proof-download flows. The browser project has not been
-published or pushed.
+Gate record (2026-08-02): `npm.cmd run test` passes 14 tests, `npm.cmd run
+build` passes, and `npm.cmd run test:browser` passes the setup, responsive,
+locked-alignment, input, correction, and proof-download flows. The browser
+project has not been published or pushed.
 
 Repository checkpoint: commit 0755713 contains the Phase 1 browser-local
 workflow and documentation. No remote push or deployment has been performed.
@@ -429,7 +429,7 @@ but the desktop application remains available as the trusted production tool.
 
 ## Phase 1 - Browser-local studio and proof output
 
-Status: Core implementation complete; UX hardening checklist remains
+Status: Complete; core commit 0755713 plus the Phase 1 hardening checkpoint
 
 Goal: Let one person choose the product and paper first, upload both required
 images, watch a locked automatic alignment run to completion, fine-tune the
@@ -605,18 +605,19 @@ small output that proves the scene model and preview are connected.
 - [x] Add tests for file type, file size, and missing-reference states.
 - [x] Add boundary tests for 50 MiB, 80 megapixels, and 16,384-pixel limits.
 - [x] Add tests that the second decoded image automatically starts alignment.
-- [ ] Add tests that pointer, keyboard, paper, mode, and export actions are
+- [x] Add tests that pointer, keyboard, paper, preview, and export actions are
       ignored while alignment is active.
 - [x] Add tests for cancellation and stale-job rejection.
-- [ ] Add a fixture with a synthetic 3x3 scene and a known center card.
+- [x] Add a fixture with a synthetic 3x3 scene and a known center card.
 - [x] Verify the proof PNG has the exact profile master pixel dimensions.
 - [x] Verify the proof PNG has a 11811-pixels-per-meter pHYs chunk and never
       contains the original card overlay or UI guides.
-- [ ] Verify corner radius changes the alpha mask without changing dimensions.
-- [ ] Verify replacing an image revokes the old object URL.
-- [ ] Test keyboard focus, Enter/Space activation, and coarse pointer dragging.
-- [ ] Test a narrow laptop viewport without creating a persistent horizontal bar.
-- [ ] Run the static server smoke test and a real browser upload test.
+- [ ] Verify corner radius changes the alpha mask without changing dimensions
+      (deferred to the Phase 2 piece renderer).
+- [x] Verify replacing an image revokes the old object URL.
+- [x] Test keyboard focus, Enter/Space activation, and coarse pointer dragging.
+- [x] Test a narrow laptop viewport without creating a persistent horizontal bar.
+- [x] Run the static server smoke test and a real browser upload test.
 
 ### Definition of done
 
@@ -751,7 +752,7 @@ correction. A timeout is not a low-confidence result.
 ### Quality and testing checklist
 
 - [ ] Build a synthetic fixture suite with known translations, scale changes,
-  repeated colors, low contrast, and no-card scenes.
+      repeated colors, low contrast, and no-card scenes.
 - [ ] Generate reference JSON from the Python processor for every profile.
 - [ ] Compare browser master and piece dimensions to the reference contract.
 - [ ] Verify the PSA label box for default and custom dimensions.

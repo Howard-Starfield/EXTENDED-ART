@@ -1,6 +1,5 @@
 import { expect, test } from "@playwright/test";
 import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import { deflateSync } from "node:zlib";
 
 function crc32(bytes) {
@@ -26,6 +25,10 @@ function pngChunk(type, data) {
 
 function solidPng(width, height) {
   const rows = Buffer.alloc((width * 4 + 1) * height);
+  return pngFromRows(width, height, rows);
+}
+
+function pngFromRows(width, height, rows) {
   const header = Buffer.alloc(13);
   header.writeUInt32BE(width, 0);
   header.writeUInt32BE(height, 4);
@@ -37,6 +40,24 @@ function solidPng(width, height) {
     pngChunk("IDAT", deflateSync(rows)),
     pngChunk("IEND", Buffer.alloc(0)),
   ]);
+}
+
+function syntheticGridPng(width, height) {
+  const rows = Buffer.alloc((width * 4 + 1) * height);
+  const colors = [
+    [38, 116, 130, 255], [242, 99, 69, 255], [116, 214, 154, 255],
+    [242, 211, 77, 255], [23, 26, 31, 255], [94, 231, 242, 255],
+    [176, 116, 214, 255], [214, 154, 116, 255], [116, 154, 214, 255],
+  ];
+  for (let y = 0; y < height; y += 1) {
+    const rowOffset = y * (width * 4 + 1);
+    for (let x = 0; x < width; x += 1) {
+      const color = colors[Math.floor(y / (height / 3)) * 3 + Math.floor(x / (width / 3))];
+      const pixelOffset = rowOffset + 1 + x * 4;
+      rows.set(color, pixelOffset);
+    }
+  }
+  return pngFromRows(width, height, rows);
 }
 
 function pngChunkData(bytes, typeName) {
@@ -53,11 +74,7 @@ function pngChunkData(bytes, typeName) {
 test("auto-aligns after both required images decode", async ({ page }) => {
   await page.goto("/");
 
-  const projectRoot = resolve(import.meta.dirname, "../..");
-  const sampleImage = resolve(
-    projectRoot,
-    "reference/assets/branding/extendedart-icon.png",
-  );
+  const sampleImage = syntheticGridPng(1000, 880);
   const cardImage = solidPng(630, 880);
 
   await page.locator("label.mode-card").first().click();
@@ -66,12 +83,29 @@ test("auto-aligns after both required images decode", async ({ page }) => {
   await page.getByRole("button", { name: "Open alignment studio" }).click();
   await expect(page.locator("#autoAlignButton")).toBeDisabled();
 
-  await page.setInputFiles("#artInput", sampleImage);
+  await page.setInputFiles("#artInput", {
+    name: "synthetic-3x3-scene.png",
+    mimeType: "image/png",
+    buffer: sampleImage,
+  });
+  const progressVisible = page.locator("#alignmentProgress").waitFor({ state: "visible" });
   await page.setInputFiles("#cardInput", {
     name: "card.png",
     mimeType: "image/png",
     buffer: cardImage,
   });
+  await progressVisible;
+  await expect(page.locator(".studio-shell")).toHaveAttribute("aria-busy", "true");
+  await expect(page.locator(".studio-shell")).toHaveAttribute("inert", "");
+  await expect(page.locator("#autoAlignButton")).toBeDisabled();
+  await page.locator("#gridToggle").click({ force: true });
+  await page.locator("#letterPaperTool").click({ force: true });
+  await page.locator("#includeCard").click({ force: true });
+  await page.locator("#includePieces").click({ force: true });
+  await expect(page.locator("#gridToggle")).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator("#letterPaperTool")).toHaveAttribute("aria-pressed", "false");
+  await expect(page.locator("#includeCard")).not.toBeChecked();
+  await expect(page.locator("#includePieces")).not.toBeChecked();
 
   await expect(page.locator("#proofButton")).toBeEnabled({ timeout: 5000 });
   await expect(page.locator("#alignmentProgress")).toBeHidden();
@@ -83,6 +117,23 @@ test("auto-aligns after both required images decode", async ({ page }) => {
   );
   await expect(page.locator("#autoAlignStatus")).toContainText("Centered only");
   await expect(page.locator("#includeCard")).not.toBeChecked();
+
+  await page.locator("#canvasShell").focus();
+  await page.locator("#canvasShell").press("ArrowRight");
+  await expect(page.locator("#offsetValue")).toHaveText("X 1 / Y 0");
+  await page.locator("#canvasShell").dispatchEvent("keydown", {
+    key: "ArrowLeft",
+    shiftKey: true,
+  });
+  await expect(page.locator("#offsetValue")).toHaveText("X -9 / Y 0");
+  const canvasBox = await page.locator("#canvasShell").boundingBox();
+  await page.mouse.move(canvasBox.x + canvasBox.width / 2, canvasBox.y + canvasBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(canvasBox.x + canvasBox.width / 2 + 16, canvasBox.y + canvasBox.height / 2 + 8);
+  await page.mouse.up();
+  await expect(page.locator("#offsetValue")).not.toHaveText("X -9 / Y 0");
+  await page.locator("#resetButton").click();
+  await expect(page.locator("#offsetValue")).toHaveText("X 0 / Y 0");
 
   const downloadPromise = page.waitForEvent("download");
   await page.locator("#proofButton").click();

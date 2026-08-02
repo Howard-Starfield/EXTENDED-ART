@@ -35,3 +35,8 @@ export function fileSummary(file, dimensions) {
   const megabytes = (file.size / 1024 / 1024).toFixed(1);
   return `${dimensions.width} × ${dimensions.height} px | ${megabytes} MB`;
 }
+
+export function replacePreviewUrl(previousUrl, file) {
+  if (previousUrl) URL.revokeObjectURL(previousUrl);
+  return URL.createObjectURL(file);
+}

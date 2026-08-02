@@ -9,7 +9,7 @@ import {
   psaLabelBox as makePsaLabelBox,
 } from "./src/profiles.js";
 import { createInitialState, imageSize, releaseImage } from "./src/state.js";
-import { fileSummary, readImage } from "./src/image-io.js";
+import { fileSummary, readImage, replacePreviewUrl } from "./src/image-io.js";
 import { classifyEffectiveDpi } from "./src/quality.js";
 import { CENTER_FIT_ALIGNMENT, createAlignmentJobRunner } from "./src/alignment.js";
 import { drawAlignmentScene, drawArtworkProof } from "./src/renderer.js";
@@ -227,7 +227,9 @@ $("#backSetupButton").addEventListener("click", () => {
   focusVisibleSetupControl();
 });
 $("#setupForm").addEventListener("submit", applySetup);
-$("#changeSetupButton").addEventListener("click", openSetup);
+$("#changeSetupButton").addEventListener("click", () => {
+  if (!state.alignmentBusy) openSetup();
+});
 $("#launchGate").addEventListener("keydown", (event) => {
   if (event.key !== "Tab") return;
   const focusable = [...$("#launchGate").querySelectorAll("input, button")]
@@ -381,8 +383,7 @@ $("#autoAlignButton").addEventListener("click", () => startAlignment("manual ret
 
 function setPreview(kind, file) {
   const key = `${kind}PreviewUrl`;
-  if (state[key]) URL.revokeObjectURL(state[key]);
-  state[key] = URL.createObjectURL(file);
+  state[key] = replacePreviewUrl(state[key], file);
   const preview = $(`#${kind}Preview`);
   preview.src = state[key];
   preview.hidden = false;
@@ -601,12 +602,27 @@ function choosePaper(paperName) {
 }
 $("#a4PaperTool").addEventListener("click", () => choosePaper("a4"));
 $("#letterPaperTool").addEventListener("click", () => choosePaper("letter"));
-$("#includeCard").addEventListener("change", requestRender);
-$("#exitAppButton").addEventListener("click", () => window.location.reload());
+$("#includeCard").addEventListener("change", (event) => {
+  if (state.alignmentBusy) {
+    event.currentTarget.checked = false;
+    return;
+  }
+  requestRender();
+});
+$("#exitAppButton").addEventListener("click", () => {
+  if (!state.alignmentBusy) window.location.reload();
+});
 ["#includePieces", "#includeMaster", "#includeFullArtPdf", "#includeWithCardPdf"].forEach((selector) => {
-  $(selector).addEventListener("change", updateExportSummary);
+  $(selector).addEventListener("change", (event) => {
+    if (state.alignmentBusy) {
+      event.currentTarget.checked = false;
+      return;
+    }
+    updateExportSummary();
+  });
 });
 $("#exportButton").addEventListener("click", () => {
+  if (state.alignmentBusy) return;
   showToast("Final PDF and ZIP export is scheduled for the next milestone.");
 });
 

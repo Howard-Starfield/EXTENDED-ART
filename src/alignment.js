@@ -11,7 +11,7 @@ export const ALIGNMENT_STAGES = Object.freeze([
   { key: "preview", label: "Preparing preview", progress: 100 },
 ]);
 
-export function createAlignmentJobRunner({ onProgress, onComplete, onCancel, onError, delay = 70, timeout = 10000 }) {
+export function createAlignmentJobRunner({ onProgress, onComplete, onCancel, onError, delay = 180, timeout = 10000 }) {
   let currentId = 0;
   let timer = null;
   let timeoutTimer = null;

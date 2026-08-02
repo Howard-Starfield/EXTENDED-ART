@@ -14,3 +14,9 @@ test("opens the local setup gate", async ({ page }) => {
   await expect(page.locator('input[name="paper"]:checked')).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Open alignment studio" })).toBeDisabled();
 });
+
+test("keeps a narrow laptop viewport free of persistent horizontal overflow", async ({ page }) => {
+  await page.setViewportSize({ width: 1100, height: 800 });
+  await page.goto("/");
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
+});
