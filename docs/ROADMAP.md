@@ -9,9 +9,10 @@ deterministic master/piece geometry, PSA/frame/binder masks, quality-report
 diagnostics, synthetic matcher release gates, correction, and proof-download
 flows. The browser project has not been published or pushed.
 
-Repository checkpoint: commit 0755713 contains the Phase 1 browser-local
-workflow; the Phase 1 hardening checkpoint is b58e40e. The Phase 2 matcher
-checkpoint will be recorded after this gate is committed. No remote push or
+Repository checkpoints: commit 0755713 contains the Phase 1 browser-local
+workflow; b58e40e is the Phase 1 hardening checkpoint; 6dd498c contains the
+Phase 2 matcher, renderer, masks, quality report, and synthetic release gates.
+P2-08 remains open for permissioned real-image fixtures. No remote push or
 deployment has been performed.
 
 Current launch scope ends with the browser-local print workflow and hosted
