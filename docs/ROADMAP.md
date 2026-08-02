@@ -816,6 +816,7 @@ Estimated effort: 2-3 sessions
 - Optional master PNG only when selected.
 - Optional full-art PDF only when selected.
 - Optional with-card reference PDF only when selected.
+- Optional second-paper output for both A4 and US Letter.
 - Print guide with a 50 mm calibration square.
 - Manifest, quality report, and print instructions.
 - One ZIP download with no empty pieces folder.
@@ -917,8 +918,9 @@ accurate cutting output.
       placements, dashed outer guides, inset internal guides, and page metadata.
 - [x] P3-03 Render cut-ready PDFs for every profile/paper combination and verify
       eight-piece binder output plus PSA/frame blank openings.
-- [x] P3-04 Implement the optional with-card PDF, piece PNGs, master PNG, and
-      reference-only full-art PDF as independent opt-in artifacts.
+- [x] P3-04 Implement the optional with-card PDF, piece PNGs, master PNG,
+      reference-only full-art PDF, and second-paper PDFs as independent opt-in
+      artifacts.
 - [x] P3-05 Generate one paper-specific print guide per selected paper with a
       measured 50 mm square and actual-size instructions.
 - [x] P3-06 Generate PRINT_INSTRUCTIONS.txt, quality_report.json, and

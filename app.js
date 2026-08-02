@@ -77,6 +77,7 @@ function updateSetupSummary() {
 
 function updateExportSummary() {
   const selected = [
+    $("#includeSecondPaper").checked ? "A4 + US Letter" : "",
     $("#includePieces").checked ? "piece PNGs" : "",
     $("#includeMaster").checked ? "master PNG" : "",
     $("#includeFullArtPdf").checked ? "full-art PDF" : "",
@@ -721,7 +722,7 @@ $("#includeCard").addEventListener("change", (event) => {
 $("#exitAppButton").addEventListener("click", () => {
   if (!state.alignmentBusy) window.location.reload();
 });
-["#includePieces", "#includeMaster", "#includeFullArtPdf", "#includeWithCardPdf"].forEach((selector) => {
+["#includeSecondPaper", "#includePieces", "#includeMaster", "#includeFullArtPdf", "#includeWithCardPdf"].forEach((selector) => {
   $(selector).addEventListener("change", (event) => {
     if (state.alignmentBusy) {
       event.currentTarget.checked = false;
@@ -751,6 +752,7 @@ $("#exportButton").addEventListener("click", async () => {
       profile: activeProfile(),
       paper: activePaper(),
       exportOptions: {
+        includeSecondPaper: $("#includeSecondPaper").checked,
         includePieces: $("#includePieces").checked,
         includeMaster: $("#includeMaster").checked,
         includeFullArtPdf: $("#includeFullArtPdf").checked,

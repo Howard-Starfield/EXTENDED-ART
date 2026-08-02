@@ -28,10 +28,13 @@ export function buildQualityReport({
   labelBox = profile.label_box,
   cornerRadiusMm = profile.recommended_corner_radius_mm || 0,
   exportOptions = {},
+  papers = null,
+  layouts = null,
 }) {
   const cardMm = cardPhysicalMm(profile);
   const art = sourceQuality("Extended artwork", artDimensions, profile.master_mm[0]);
   const card = sourceQuality("Original card", cardDimensions, cardMm[0]);
+  const paperSet = papers || (paper ? [paper] : []);
   const warnings = [art, card]
     .filter(Boolean)
     .filter((result) => result.level !== "pass")
@@ -49,6 +52,7 @@ export function buildQualityReport({
     profileVersion: profile.version || null,
     profile: profile.name,
     paper: paper ? { name: paper.name, label: paper.label, sizeMm: [...paper.size_mm] } : null,
+    papers: paperSet.map((item) => ({ name: item.name, label: item.label, sizeMm: [...item.size_mm] })),
     overallStatus: blocked ? "BLOCKED" : warnings.length ? "PASS_WITH_WARNINGS" : "PASS",
     sources: {
       artwork: artDimensions ? { dimensions: { ...artDimensions }, effectiveDpi: art?.dpi ?? null, quality: art } : null,
@@ -73,6 +77,13 @@ export function buildQualityReport({
       elapsedMs: alignment.elapsedMs ?? null,
     } : null,
     cutouts: cutoutReport(profile, labelBox, cornerRadiusMm),
+    pageLayouts: (layouts || []).map((layout) => ({
+      paper: layout.paper,
+      pageSizeMm: [...layout.pageSizeMm],
+      pageCount: layout.pageCount,
+      status: layout.status,
+      warnings: [...layout.warnings],
+    })),
     exportOptions: { ...exportOptions },
     warnings,
   };

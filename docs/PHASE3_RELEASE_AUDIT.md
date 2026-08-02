@@ -18,7 +18,8 @@ default archive contains only the cut-ready PDF, print guide, instructions,
 quality report, and manifest. It does not contain the raw card, a pieces
 directory, the master, or the full-art PDF. The opt-in archive verifies the
 master dimensions (2,232 × 3,118 px), 300-DPI `pHYs` metadata (11,811 pixels per
-meter), sRGB intent, and standard-piece dimensions (744 × 1,039 px).
+meter), sRGB intent, standard-piece dimensions (744 × 1,039 px), and additive
+exact-size A4 and US Letter PDFs when the second-paper option is selected.
 
 The unit suite also verifies exact A4/Letter page boxes, Vault Letter
 pagination, scale-1 placements, cutout geometry, blank PSA/frame chambers,

@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { Uint8ArrayReader, Uint8ArrayWriter, ZipReader } from "@zip.js/zip.js";
+import { TextWriter, Uint8ArrayReader, Uint8ArrayWriter, ZipReader } from "@zip.js/zip.js";
 import { readFileSync } from "node:fs";
 import { deflateSync } from "node:zlib";
 
@@ -169,7 +169,7 @@ test("auto-aligns after both required images decode", async ({ page }) => {
   await zipReader.close();
   await expect(page.locator("#resultPanel")).toBeVisible();
 
-  for (const selector of ["#includePieces", "#includeMaster", "#includeFullArtPdf", "#includeWithCardPdf"]) {
+  for (const selector of ["#includeSecondPaper", "#includePieces", "#includeMaster", "#includeFullArtPdf", "#includeWithCardPdf"]) {
     await page.locator(selector).check();
   }
   const optionalDownloadPromise = page.waitForEvent("download");
@@ -182,6 +182,14 @@ test("auto-aligns after both required images decode", async ({ page }) => {
   expect(optionalNames.some((name) => name.endsWith("_master_300dpi.png"))).toBe(true);
   expect(optionalNames.some((name) => name.endsWith("_full_art_reference.pdf"))).toBe(true);
   expect(optionalNames.some((name) => name.endsWith("_with_card_reference.pdf"))).toBe(true);
+  expect(optionalNames).toContain("synthetic_3x3_scene_standard_letter_cut_ready.pdf");
+  expect(optionalNames).toContain("synthetic_3x3_scene_standard_letter_print_guide.pdf");
+  expect(optionalNames).toContain("synthetic_3x3_scene_standard_letter_full_art_reference.pdf");
+  expect(optionalNames).toContain("synthetic_3x3_scene_standard_letter_with_card_reference.pdf");
+  const manifestEntry = optionalEntries.find((entry) => entry.filename === "manifest.json");
+  const manifest = JSON.parse(await manifestEntry.getData(new TextWriter()));
+  expect(manifest.paperSet.map((item) => item.name)).toEqual(["a4", "letter"]);
+  expect(manifest.pageLayouts.map((item) => item.paper)).toEqual(["a4", "letter"]);
   expect(optionalNames.filter((name) => name.startsWith("pieces/")).length).toBe(8);
   const masterEntry = optionalEntries.find((entry) => entry.filename.endsWith("_master_300dpi.png"));
   const masterBytes = Buffer.from(await masterEntry.getData(new Uint8ArrayWriter()));
