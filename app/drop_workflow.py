@@ -27,6 +27,12 @@ DEFAULT_CONFIG = {
     "scale_mode": "fit",
     "safe_margin_mm": 4.0,
     "corner_radius_mm": 0.0,
+    "paper_format": "both",
+    "include_pieces": False,
+    "include_master": False,
+    "include_full_art_pdf": False,
+    "psa_label_width_mm": 69.85,
+    "psa_label_height_mm": 21.59,
     "keep_unzipped_package": True,
     "poll_seconds": 2.0,
     "settle_seconds": 3.0,
@@ -256,6 +262,8 @@ def parse_args() -> argparse.Namespace:
     web_parser = subcommands.add_parser("web", help="Open the local browser alignment studio")
     web_parser.add_argument("--port", type=int, default=8765)
     web_parser.add_argument("--no-browser", action="store_true")
+    shutdown_parser = subcommands.add_parser("shutdown", help="Stop a running local studio")
+    shutdown_parser.add_argument("--port", type=int, default=8765)
     process_parser = subcommands.add_parser("process", help="Process one or more image paths")
     process_parser.add_argument("images", nargs="+")
     return parser.parse_args()
@@ -276,6 +284,9 @@ def main() -> int:
     if command == "web":
         from web_ui import serve
         return serve(root, args.port, not args.no_browser)
+    if command == "shutdown":
+        from web_ui import request_shutdown
+        return request_shutdown(args.port)
     if command == "process":
         failures = 0
         for value in args.images:

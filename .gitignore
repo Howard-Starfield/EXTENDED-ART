@@ -1,5 +1,6 @@
 # Python environments and caches
 .venv/
+.build-venv/
 venv/
 __pycache__/
 *.py[cod]
@@ -14,6 +15,7 @@ htmlcov/
 # Generated application builds
 build/
 dist/
+release/
 .exe-temp/
 *.exe
 *.zip
@@ -37,3 +39,7 @@ FAILED_INPUTS/
 .DS_Store
 Thumbs.db
 Desktop.ini
+
+# Local UAT screenshots
+extendedart-*.png
+*-uat.png

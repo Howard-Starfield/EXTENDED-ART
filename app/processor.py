@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
-"""Deterministic 3x3 extended-art print package builder.
+"""Deterministic extended-art print package builder.
 
 This module performs no AI generation and makes no network requests. It takes
-one completed full-page image, crops or fits it to a selected 3x3 insert
-profile, exports the master and nine pieces, and creates print-ready PDFs.
+one completed full-page image, crops or fits it to a selected physical product
+profile, exports the master and finished pieces, and creates print-ready PDFs.
 """
 
 from __future__ import annotations
 
 import json
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from typing import Iterable
 
@@ -18,9 +18,16 @@ from reportlab.lib.colors import Color, white
 from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen import canvas
 
+from version import APP_VERSION
+
 
 DPI = 300
 MM_PER_INCH = 25.4
+PSA_OUTER_MM = (80.264, 135.128)
+PSA_LABEL_MM = (69.85, 21.59)
+PSA_LABEL_TOP_MM = 5.0
+PSA_CARD_MM = (63.0, 88.0)
+PSA_CARD_TOP_MM = 36.0
 
 
 @dataclass(frozen=True)
@@ -29,6 +36,12 @@ class Profile:
     label: str
     insert_w_mm: float
     insert_h_mm: float
+    columns: int
+    rows: int
+    card_box: tuple[float, float, float, float]
+    description: str
+    label_box: tuple[float, float, float, float] | None
+    recommended_corner_radius_mm: float
 
     @property
     def insert_px(self) -> tuple[int, int]:
@@ -40,9 +53,17 @@ class Profile:
     @property
     def master_px(self) -> tuple[int, int]:
         return (
-            round(self.insert_w_mm * 3 / MM_PER_INCH * DPI),
-            round(self.insert_h_mm * 3 / MM_PER_INCH * DPI),
+            round(self.insert_w_mm * self.columns / MM_PER_INCH * DPI),
+            round(self.insert_h_mm * self.rows / MM_PER_INCH * DPI),
         )
+
+    @property
+    def master_mm(self) -> tuple[float, float]:
+        return (self.insert_w_mm * self.columns, self.insert_h_mm * self.rows)
+
+    @property
+    def piece_count(self) -> int:
+        return self.columns * self.rows
 
 
 @dataclass(frozen=True)
@@ -55,11 +76,110 @@ class BuildOptions:
     scale_mode: str = "fit"
     safe_margin_mm: float = 4.0
     corner_radius_mm: float = 0.0
+    paper_format: str = "both"
+    include_pieces: bool = False
+    include_master: bool = False
+    include_full_art_pdf: bool = False
+    cutout_card_zone: bool = False
+    psa_label_width_mm: float = PSA_LABEL_MM[0]
+    psa_label_height_mm: float = PSA_LABEL_MM[1]
+
+
+def normalized_box_from_mm(
+    total_w_mm: float,
+    total_h_mm: float,
+    left_mm: float,
+    top_mm: float,
+    width_mm: float,
+    height_mm: float,
+) -> tuple[float, float, float, float]:
+    """Convert an audited physical opening to normalized profile coordinates."""
+    return (
+        left_mm / total_w_mm,
+        top_mm / total_h_mm,
+        (left_mm + width_mm) / total_w_mm,
+        (top_mm + height_mm) / total_h_mm,
+    )
+
+
+PSA_LABEL_BOX = normalized_box_from_mm(
+    *PSA_OUTER_MM,
+    (PSA_OUTER_MM[0] - PSA_LABEL_MM[0]) / 2,
+    PSA_LABEL_TOP_MM,
+    *PSA_LABEL_MM,
+)
+PSA_CARD_BOX = normalized_box_from_mm(
+    *PSA_OUTER_MM,
+    (PSA_OUTER_MM[0] - PSA_CARD_MM[0]) / 2,
+    PSA_CARD_TOP_MM,
+    *PSA_CARD_MM,
+)
+
+
+def profile_for_options(profile: Profile, options: BuildOptions) -> Profile:
+    """Return a profile with per-job physical cutout settings applied."""
+    if profile.name != "psa":
+        return profile
+    width_mm = float(options.psa_label_width_mm)
+    height_mm = float(options.psa_label_height_mm)
+    label_box = normalized_box_from_mm(
+        *PSA_OUTER_MM,
+        (PSA_OUTER_MM[0] - width_mm) / 2,
+        PSA_LABEL_TOP_MM,
+        width_mm,
+        height_mm,
+    )
+    return replace(profile, label_box=label_box)
 
 
 PROFILES = {
-    "standard": Profile("standard", "Standard", 63.0, 88.0),
-    "vaultx": Profile("vaultx", "Vault X-compatible", 66.0, 94.0),
+    "standard": Profile(
+        "standard",
+        "Standard 3×3 Binder",
+        63.0,
+        88.0,
+        3,
+        3,
+        (1 / 3, 1 / 3, 2 / 3, 2 / 3),
+        "Nine standard trading-card inserts with a center card reference.",
+        None,
+        3.0,
+    ),
+    "vaultx": Profile(
+        "vaultx",
+        "Vault Binder",
+        66.0,
+        94.0,
+        3,
+        3,
+        (1 / 3, 1 / 3, 2 / 3, 2 / 3),
+        "Nine 66 x 94 mm inserts for Vault-style binder pockets.",
+        None,
+        3.0,
+    ),
+    "psa": Profile(
+        "psa",
+        "PSA Slab",
+        *PSA_OUTER_MM,
+        1,
+        1,
+        PSA_CARD_BOX,
+        "One extended-art insert sized to a modern PSA holder envelope.",
+        PSA_LABEL_BOX,
+        3.0,
+    ),
+    "photo8x10": Profile(
+        "photo8x10",
+        "8x10 Photo Frame",
+        203.2,
+        254.0,
+        1,
+        1,
+        normalized_box_from_mm(203.2, 254.0, 70.1, 83.0, 63.0, 88.0),
+        "One 8 x 10 inch display print with a centered card reference.",
+        None,
+        0.0,
+    ),
 }
 
 PAPER_SIZES_MM = {
@@ -72,14 +192,58 @@ def mm_to_pt(mm: float) -> float:
     return mm / MM_PER_INCH * 72.0
 
 
+def calculate_page_layout(
+    profile: Profile,
+    paper_name: str,
+    gap_mm: float = 2.0,
+    safe_margin_mm: float = 4.0,
+    scale_mode: str = "fit",
+) -> dict:
+    """Return the shared physical page placement contract used by PDF and UI."""
+    if paper_name not in PAPER_SIZES_MM:
+        raise ValueError("paper_name must be a4 or letter")
+    page_w_mm, page_h_mm = PAPER_SIZES_MM[paper_name]
+    base_w = profile.insert_w_mm * profile.columns + gap_mm * (profile.columns - 1)
+    base_h = profile.insert_h_mm * profile.rows + gap_mm * (profile.rows - 1)
+    scale = 1.0
+    warning = None
+    if base_w + safe_margin_mm * 2 > page_w_mm or base_h + safe_margin_mm * 2 > page_h_mm:
+        if scale_mode != "fit":
+            warning = (
+                f"{profile.name} {paper_name} cannot fit at exact size with the selected "
+                "gaps and margins"
+            )
+        else:
+            scale = min(
+                (page_w_mm - safe_margin_mm * 2) / base_w,
+                (page_h_mm - safe_margin_mm * 2) / base_h,
+            )
+            warning = f"Scaled to {scale * 100:.2f}% to fit {paper_name}"
+    layout_w = base_w * scale
+    layout_h = base_h * scale
+    return {
+        "paper": paper_name,
+        "page_mm": [page_w_mm, page_h_mm],
+        "content_mm": [base_w, base_h],
+        "layout_mm": [layout_w, layout_h],
+        "offset_mm": [(page_w_mm - layout_w) / 2, (page_h_mm - layout_h) / 2],
+        "scale": round(scale, 6),
+        "warning": warning,
+        "gap_mm": gap_mm,
+        "safe_margin_mm": safe_margin_mm,
+    }
+
+
 def safe_slug(value: str) -> str:
     cleaned = "".join(char if char.isalnum() or char in "-_" else "_" for char in value)
     return cleaned.strip("_") or "extended_art"
 
 
 def validate_options(options: BuildOptions) -> None:
-    if options.profile not in {"standard", "vaultx", "both"}:
-        raise ValueError("profile must be standard, vaultx, or both")
+    if options.profile not in {*PROFILES, "both"}:
+        raise ValueError("profile must be standard, vaultx, psa, photo8x10, or both")
+    if options.paper_format not in {*PAPER_SIZES_MM, "both"}:
+        raise ValueError("paper_format must be a4, letter, or both")
     if options.source_mode not in {"crop", "fit"}:
         raise ValueError("source_mode must be crop or fit")
     if options.scale_mode not in {"fit", "warn"}:
@@ -90,6 +254,10 @@ def validate_options(options: BuildOptions) -> None:
         raise ValueError("gap_mm and safe_margin_mm cannot be negative")
     if not 0.0 <= options.corner_radius_mm <= 12.0:
         raise ValueError("corner_radius_mm must be between 0 and 12")
+    if not 40.0 <= options.psa_label_width_mm <= 76.0:
+        raise ValueError("PSA label cutout width must be between 40 and 76 mm")
+    if not 10.0 <= options.psa_label_height_mm <= 30.0:
+        raise ValueError("PSA label cutout height must be between 10 and 30 mm")
 
 
 def verify_image(path: Path) -> None:
@@ -184,14 +352,41 @@ def split_pieces(
     piece_w, piece_h = profile.insert_px
     radius_px = round(corner_radius_mm / MM_PER_INCH * DPI)
     pieces: list[Image.Image] = []
-    x_edges = [round(i * master.width / 3) for i in range(4)]
-    y_edges = [round(i * master.height / 3) for i in range(4)]
-    for row in range(3):
-        for col in range(3):
+    x_edges = [round(i * master.width / profile.columns) for i in range(profile.columns + 1)]
+    y_edges = [round(i * master.height / profile.rows) for i in range(profile.rows + 1)]
+    for row in range(profile.rows):
+        for col in range(profile.columns):
             crop = master.crop((x_edges[col], y_edges[row], x_edges[col + 1], y_edges[row + 1]))
             resized = crop.resize((piece_w, piece_h), Image.Resampling.LANCZOS)
             pieces.append(apply_corner_radius(resized, radius_px))
     return pieces
+
+
+def cutout_regions(
+    profile: Profile,
+    cutout_card_zone: bool,
+) -> list[tuple[str, tuple[float, float, float, float], float]]:
+    if profile.piece_count != 1:
+        return []
+    regions: list[tuple[str, tuple[float, float, float, float], float]] = []
+    if profile.label_box is not None:
+        regions.append(("PSA label", profile.label_box, 1.0))
+    if cutout_card_zone:
+        regions.append(("card chamber", profile.card_box, 3.0))
+    return regions
+
+
+def normalized_box_to_mm(
+    profile: Profile,
+    box: tuple[float, float, float, float],
+) -> list[float]:
+    left, top, right, bottom = box
+    return [
+        round(left * profile.insert_w_mm, 3),
+        round(top * profile.insert_h_mm, 3),
+        round((right - left) * profile.insert_w_mm, 3),
+        round((bottom - top) * profile.insert_h_mm, 3),
+    ]
 
 
 def draw_cut_page(
@@ -203,27 +398,13 @@ def draw_cut_page(
     scale_mode: str,
     safe_margin_mm: float,
     corner_radius_mm: float,
+    cutout_card_zone: bool,
 ) -> dict:
-    page_w_mm, page_h_mm = PAPER_SIZES_MM[paper_name]
-    base_w = profile.insert_w_mm * 3 + gap_mm * 2
-    base_h = profile.insert_h_mm * 3 + gap_mm * 2
-    scale = 1.0
-    warning = None
-
-    if base_w + safe_margin_mm * 2 > page_w_mm or base_h + safe_margin_mm * 2 > page_h_mm:
-        if scale_mode != "fit":
-            warning = f"{profile.name} {paper_name} cannot fit at exact size with the selected gaps and margins"
-        else:
-            scale = min(
-                (page_w_mm - safe_margin_mm * 2) / base_w,
-                (page_h_mm - safe_margin_mm * 2) / base_h,
-            )
-            warning = f"Scaled to {scale * 100:.2f}% to fit {paper_name}"
-
-    layout_w = base_w * scale
-    layout_h = base_h * scale
-    left_mm = (page_w_mm - layout_w) / 2
-    top_mm = (page_h_mm - layout_h) / 2
+    layout = calculate_page_layout(profile, paper_name, gap_mm, safe_margin_mm, scale_mode)
+    page_w_mm, page_h_mm = layout["page_mm"]
+    scale = layout["scale"]
+    warning = layout["warning"]
+    left_mm, top_mm = layout["offset_mm"]
     page_w_pt, page_h_pt = mm_to_pt(page_w_mm), mm_to_pt(page_h_mm)
 
     pdf = canvas.Canvas(str(pdf_path), pagesize=(page_w_pt, page_h_pt))
@@ -234,8 +415,9 @@ def draw_cut_page(
     piece_list = list(pieces)
     line_color = Color(0.42, 0.42, 0.42, alpha=0.9)
     index = 0
-    for row in range(3):
-        for col in range(3):
+    cutouts = cutout_regions(profile, cutout_card_zone)
+    for row in range(profile.rows):
+        for col in range(profile.columns):
             x_mm = left_mm + col * (profile.insert_w_mm + gap_mm) * scale
             y_mm = page_h_mm - top_mm - (row + 1) * profile.insert_h_mm * scale - row * gap_mm * scale
             w_mm = profile.insert_w_mm * scale
@@ -251,13 +433,38 @@ def draw_cut_page(
                 preserveAspectRatio=False,
                 mask="auto",
             )
+            for region_label, region_box, region_radius_mm in cutouts:
+                left, top, right, bottom = region_box
+                region_x = x_pt + left * w_pt
+                region_y = y_pt + (1.0 - bottom) * h_pt
+                region_w = (right - left) * w_pt
+                region_h = (bottom - top) * h_pt
+                region_radius = mm_to_pt(region_radius_mm * scale)
+                pdf.setFillColor(white)
+                pdf.setStrokeColor(Color(0.34, 0.37, 0.38))
+                pdf.setLineWidth(0.55)
+                pdf.setLineCap(1)
+                pdf.setDash(0.6, 1.5)
+                if region_radius_mm > 0:
+                    pdf.roundRect(region_x, region_y, region_w, region_h, region_radius, stroke=1, fill=1)
+                else:
+                    pdf.rect(region_x, region_y, region_w, region_h, stroke=1, fill=1)
+                pdf.setDash()
+                pdf.setLineCap(0)
+
             pdf.setStrokeColor(line_color)
-            pdf.setLineWidth(0.35)
+            pdf.setLineWidth(0.45 if profile.name == "psa" else 0.35)
+            if profile.name == "psa":
+                pdf.setLineCap(1)
+                pdf.setDash(0.6, 1.5)
             if corner_radius_mm > 0:
                 radius_pt = min(mm_to_pt(corner_radius_mm * scale), w_pt / 2, h_pt / 2)
                 pdf.roundRect(x_pt, y_pt, w_pt, h_pt, radius_pt, stroke=1, fill=0)
             else:
                 pdf.rect(x_pt, y_pt, w_pt, h_pt, stroke=1, fill=0)
+            if profile.name == "psa":
+                pdf.setDash()
+                pdf.setLineCap(0)
             index += 1
 
     pdf.setFillColor(Color(0.25, 0.25, 0.25))
@@ -275,13 +482,22 @@ def draw_cut_page(
         "gap_mm": gap_mm,
         "safe_margin_mm": safe_margin_mm,
         "corner_radius_mm": corner_radius_mm,
+        "cutouts": [
+            {
+                "label": label,
+                "box": list(box),
+                "box_mm": normalized_box_to_mm(profile, box),
+            }
+            for label, box, _ in cutouts
+        ],
+        "dotted_guides": profile.name == "psa",
     }
 
 
-def draw_full_art_pdf(pdf_path: Path, master_path: Path, profile: Profile, paper_name: str) -> dict:
+def draw_full_art_pdf(pdf_path: Path, master: Image.Image, profile: Profile, paper_name: str) -> dict:
     page_w_mm, page_h_mm = PAPER_SIZES_MM[paper_name]
     page_w_pt, page_h_pt = mm_to_pt(page_w_mm), mm_to_pt(page_h_mm)
-    image_w_mm = min(page_w_mm - 12, profile.insert_w_mm * 3)
+    image_w_mm = min(page_w_mm - 12, profile.master_mm[0])
     image_h_mm = image_w_mm * (profile.master_px[1] / profile.master_px[0])
     if image_h_mm > page_h_mm - 20:
         image_h_mm = page_h_mm - 20
@@ -291,7 +507,7 @@ def draw_full_art_pdf(pdf_path: Path, master_path: Path, profile: Profile, paper
     pdf = canvas.Canvas(str(pdf_path), pagesize=(page_w_pt, page_h_pt))
     pdf.setTitle(f"{profile.label} full artwork - {paper_name.upper()}")
     pdf.drawImage(
-        ImageReader(str(master_path)),
+        ImageReader(master),
         mm_to_pt(x_mm),
         mm_to_pt(y_mm),
         width=mm_to_pt(image_w_mm),
@@ -309,8 +525,13 @@ def draw_full_art_pdf(pdf_path: Path, master_path: Path, profile: Profile, paper
     }
 
 
-def draw_print_guide(pdf_path: Path, profile: Profile, page_reports: list[dict]) -> None:
-    page_w_mm, page_h_mm = PAPER_SIZES_MM["a4"]
+def draw_print_guide(
+    pdf_path: Path,
+    profile: Profile,
+    page_reports: list[dict],
+    guide_paper: str,
+) -> None:
+    page_w_mm, page_h_mm = PAPER_SIZES_MM[guide_paper]
     pdf = canvas.Canvas(str(pdf_path), pagesize=(mm_to_pt(page_w_mm), mm_to_pt(page_h_mm)))
     pdf.setTitle(f"{profile.label} extended art print guide")
     x = mm_to_pt(14)
@@ -322,12 +543,32 @@ def draw_print_guide(pdf_path: Path, profile: Profile, page_reports: list[dict])
     pdf.setFont("Helvetica", 10)
     lines = [
         f"Profile: {profile.label}",
+        f"Layout: {profile.columns} x {profile.rows} ({profile.piece_count} finished piece(s))",
         f"Final insert: {profile.insert_w_mm:g} x {profile.insert_h_mm:g} mm",
         f"Individual PNG: {profile.insert_px[0]} x {profile.insert_px[1]} pixels at {DPI} DPI",
         "Print at 100% / Actual Size. Disable Fit to Page and borderless expansion.",
         "Measure the square below and test one sheet in the intended binder before selling.",
         "Cut on the thin gray rectangles. Insert pieces left-to-right, top-to-bottom.",
     ]
+    cutout_labels = {
+        cutout["label"]
+        for report in page_reports
+        for cutout in report.get("cutouts", [])
+    }
+    if cutout_labels:
+        lines[-1] = "Cut the dotted outer edge and blank " + ", ".join(sorted(cutout_labels)) + " guides."
+        cutout_sizes = {
+            cutout["label"]: cutout["box_mm"][2:]
+            for report in page_reports
+            for cutout in report.get("cutouts", [])
+        }
+        lines.append(
+            "Blank openings: "
+            + "; ".join(
+                f"{label} {size[0]:g} x {size[1]:g} mm"
+                for label, size in sorted(cutout_sizes.items())
+            )
+        )
     for line in lines:
         pdf.drawString(x, y, line)
         y -= mm_to_pt(7)
@@ -357,7 +598,12 @@ def draw_print_guide(pdf_path: Path, profile: Profile, page_reports: list[dict])
     pdf.save()
 
 
-def write_customer_instructions(path: Path, profile_results: dict, warnings: list[str]) -> None:
+def write_customer_instructions(
+    path: Path,
+    profile_results: dict,
+    warnings: list[str],
+    paper_format: str,
+) -> None:
     profile_lines = []
     for result in profile_results.values():
         profile_lines.append(
@@ -365,6 +611,24 @@ def write_customer_instructions(path: Path, profile_results: dict, warnings: lis
             f"({result['insert_px'][0]} x {result['insert_px'][1]} px per insert)"
         )
     warning_lines = [f"- {warning}" for warning in warnings] or ["- No automated warnings."]
+    paper_label = "A4 or Letter" if paper_format == "both" else paper_format.upper()
+    total_pieces = sum(result["piece_count"] for result in profile_results.values())
+    placement_line = (
+        "6. Insert pieces 01-09 left-to-right, top-to-bottom."
+        if total_pieces > 1
+        else "6. Place the single finished print in the intended holder or frame."
+    )
+    cutout_labels = {
+        cutout["label"]
+        for result in profile_results.values()
+        for page in result["pages"]
+        for cutout in page.get("cutouts", [])
+    }
+    cut_instruction = (
+        "5. Cut the dotted outer edge and blank " + ", ".join(sorted(cutout_labels)) + " guides."
+        if cutout_labels
+        else "5. Cut on the thin gray rectangle borders."
+    )
     content = "\n".join(
         [
             "EXTENDED ART - PRINT FIRST",
@@ -374,12 +638,12 @@ def write_customer_instructions(path: Path, profile_results: dict, warnings: lis
             *profile_lines,
             "",
             "Printing:",
-            "1. Open the A4 or Letter CUT_READY PDF for your paper.",
+            f"1. Open the {paper_label} CUT_READY PDF.",
             "2. Select 100% or Actual Size in the print dialog.",
             "3. Turn off Fit to Page, Shrink Oversized Pages, and borderless expansion.",
             "4. Print the matching print guide and verify its 50 mm calibration square.",
-            "5. Cut on the thin gray rectangle borders.",
-            "6. Insert pieces 01-09 left-to-right, top-to-bottom.",
+            cut_instruction,
+            placement_line,
             "",
             "Automated quality notes:",
             *warning_lines,
@@ -400,23 +664,29 @@ def build_profile(
     profile_dir = output_root / profile.name
     pieces_dir = profile_dir / "pieces"
     pages_dir = profile_dir / "pdf"
-    pieces_dir.mkdir(parents=True, exist_ok=True)
+    profile_dir.mkdir(parents=True, exist_ok=True)
     pages_dir.mkdir(parents=True, exist_ok=True)
+    if options.include_pieces:
+        pieces_dir.mkdir(parents=True, exist_ok=True)
 
     master, normalization = normalize_master(
         source, profile, options.source_mode, options.focus_x, options.focus_y
     )
-    master_path = profile_dir / f"{slug}_{profile.name}_master_300dpi.png"
-    master.save(master_path, format="PNG", dpi=(DPI, DPI))
+    master_path: Path | None = None
+    if options.include_master:
+        master_path = profile_dir / f"{slug}_{profile.name}_master_300dpi.png"
+        master.save(master_path, format="PNG", dpi=(DPI, DPI))
     pieces = split_pieces(master, profile, options.corner_radius_mm)
     piece_paths = []
-    for index, piece in enumerate(pieces, start=1):
-        path = pieces_dir / f"{slug}_{profile.name}_piece_{index:02d}.png"
-        piece.save(path, format="PNG", dpi=(DPI, DPI))
-        piece_paths.append(str(path))
+    if options.include_pieces:
+        for index, piece in enumerate(pieces, start=1):
+            path = pieces_dir / f"{slug}_{profile.name}_piece_{index:02d}.png"
+            piece.save(path, format="PNG", dpi=(DPI, DPI))
+            piece_paths.append(str(path))
 
     page_reports = []
-    for paper_name in ("a4", "letter"):
+    paper_names = ("a4", "letter") if options.paper_format == "both" else (options.paper_format,)
+    for paper_name in paper_names:
         page_path = pages_dir / f"{slug}_{profile.name}_{paper_name}_cut_ready.pdf"
         page_reports.append(
             draw_cut_page(
@@ -428,29 +698,46 @@ def build_profile(
                 options.scale_mode,
                 options.safe_margin_mm,
                 options.corner_radius_mm,
+                options.cutout_card_zone,
             )
         )
-        full_path = pages_dir / f"{slug}_{profile.name}_{paper_name}_full_artwork.pdf"
-        page_reports.append(draw_full_art_pdf(full_path, master_path, profile, paper_name))
+        if options.include_full_art_pdf:
+            full_path = pages_dir / f"{slug}_{profile.name}_{paper_name}_full_artwork.pdf"
+            page_reports.append(draw_full_art_pdf(full_path, master, profile, paper_name))
 
-    guide_path = profile_dir / f"{slug}_{profile.name}_print_guide.pdf"
-    draw_print_guide(guide_path, profile, page_reports)
+    guide_paper = "a4" if options.paper_format == "both" else options.paper_format
+    guide_path = profile_dir / f"{slug}_{profile.name}_{guide_paper}_print_guide.pdf"
+    draw_print_guide(guide_path, profile, page_reports, guide_paper)
 
     return {
         "profile": profile.name,
         "label": profile.label,
         "insert_mm": [profile.insert_w_mm, profile.insert_h_mm],
         "insert_px": list(profile.insert_px),
-        "master_mm": [profile.insert_w_mm * 3, profile.insert_h_mm * 3],
+        "grid": [profile.columns, profile.rows],
+        "piece_count": profile.piece_count,
+        "master_mm": list(profile.master_mm),
         "master_px": list(profile.master_px),
         "master_dpi": DPI,
-        "master_path": str(master_path),
+        "card_box_mm": normalized_box_to_mm(profile, profile.card_box),
+        "label_box_mm": (
+            normalized_box_to_mm(profile, profile.label_box)
+            if profile.label_box is not None
+            else None
+        ),
+        "master_path": str(master_path) if master_path else None,
         "pieces": piece_paths,
         "pages": page_reports,
         "print_guide": str(guide_path),
         "normalization": normalization,
         "focus": [options.focus_x, options.focus_y],
         "corner_radius_mm": options.corner_radius_mm,
+        "included_outputs": {
+            "cut_ready_pdf": True,
+            "pieces": options.include_pieces,
+            "master_png": options.include_master,
+            "full_art_pdf": options.include_full_art_pdf,
+        },
     }
 
 
@@ -480,7 +767,13 @@ def build_package(
         }
         names = ["standard", "vaultx"] if options.profile == "both" else [options.profile]
         results = {
-            name: build_profile(source, PROFILES[name], output_dir, slug, options)
+            name: build_profile(
+                source,
+                profile_for_options(PROFILES[name], options),
+                output_dir,
+                slug,
+                options,
+            )
             for name in names
         }
 
@@ -507,7 +800,7 @@ def build_package(
 
     manifest = {
         "tool": "ExtendedArt Offline Workflow",
-        "version": "1.0.0",
+        "version": APP_VERSION,
         "offline": True,
         "input": original,
         "output_dir": str(output_dir),
@@ -530,7 +823,7 @@ def build_package(
     report_path = output_dir / f"{slug}_quality_report.json"
     report_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
     instructions_path = output_dir / "PRINT_INSTRUCTIONS.txt"
-    write_customer_instructions(instructions_path, results, warnings)
+    write_customer_instructions(instructions_path, results, warnings, options.paper_format)
 
     return {
         "manifest": str(manifest_path),

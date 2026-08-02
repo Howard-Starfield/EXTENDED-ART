@@ -1,86 +1,100 @@
 # ExtendedArt Offline Workflow
 
-Turn one completed vertical extended-art image into a customer-ready Standard
-3×3 binder package without uploading the artwork anywhere.
+## Install on Windows
+
+1. Download **`ExtendedArt-Setup-v1.7.0.exe`** from the
+   [latest GitHub release](https://github.com/Howard-Starfield/EXTENDED-ART/releases/latest).
+2. Run the installer. It installs per user and does not require administrator
+   access by default.
+3. Open **ExtendedArt** from the Start Menu or the optional desktop shortcut.
+4. ExtendedArt starts its offline service and opens the studio in your default
+   browser. Use **Exit app** in the top bar when finished.
+
+The release is not code-signed, so Windows SmartScreen may show an unknown
+publisher warning. Verify the download came from the official GitHub release
+before choosing **More info -> Run anyway**.
+
+Turn one completed extended-art image into a customer-ready binder, slab, or
+display-frame package without uploading the artwork anywhere.
+
+The browser studio now opens with a print setup desk on every launch. Choose
+the physical product and the paper before alignment:
+
+| Product mode | 300-DPI master | Finished output |
+| --- | --- | --- |
+| Standard 3×3 Binder | 2,232 × 3,118 px | nine 63 × 88 mm inserts |
+| Vault Binder | 2,339 × 3,331 px | nine 66 × 94 mm inserts |
+| PSA Slab | 948 × 1,596 px | one 3.16 × 5.32 in insert |
+| 8×10 Photo Frame | 2,400 × 3,000 px | one 8 × 10 in print |
+
+Choose either A4 or US Letter. Browser-created packages contain PDFs for the
+selected paper only.
 
 The default Standard output is:
 
-- full 3×3 master: **2,232 × 3,118 pixels at 300 DPI**;
 - physical full layout: **189 × 264 mm**;
 - each insert: **63 × 88 mm**;
-- each insert PNG: **744 × 1,039 pixels at 300 DPI**;
-- nine individual PNG pieces;
 - A4 and US Letter cut-ready PDFs;
-- A4 and US Letter full-artwork PDFs;
 - print guide with a 50 mm calibration square;
 - manifest, automated quality report, and one deliverable ZIP.
+
+The 2,232 × 3,118 master PNG, nine 744 × 1,039 piece PNGs, and full-art PDFs
+are optional extras. Browser and automatic workflows now default them off.
 
 The image processing and PDF packaging are fully offline. GPT Image 2 is only
 used beforehand if you choose to generate the artwork with it.
 
-## Recommended: browser alignment studio
+## Usage: browser alignment studio
 
-1. Extract the workflow ZIP to a normal folder.
-2. Double-click **`START_ALIGNMENT_STUDIO.cmd`**.
-3. Your browser opens a local alignment desk. Nothing is uploaded.
-4. Drop the completed extended-art image into **Extended artwork**.
-5. Drop a clean scan or image of the original game card into **Original card**.
-6. Select **Auto align artwork**. The offline matcher applies a suggested zoom
+1. Install the latest Windows release.
+2. Open **ExtendedArt** from the Start Menu. If it is already running, opening
+   the shortcut brings the existing local studio back in your browser.
+3. Choose Standard 3×3, Vault Binder, PSA Slab, or 8×10 Photo Frame.
+4. Choose A4 or US Letter, then select **Open alignment studio**.
+   The same measured paper buttons remain beside **Grid**, **Card**, and
+   **Difference**. They show each sheet size and the backend-calculated print
+   scale, and can switch the export paper without reopening setup.
+5. Drop the completed extended-art image into **Extended artwork**.
+6. Drop a clean scan or image of the original game card into **Original card**.
+7. Select **Auto align artwork**. The offline matcher applies a suggested zoom
    and X/Y position, then shows its confidence and matched card-art region.
-7. Inspect the card edges. Drag the extended art under the fixed center card or use
+8. Inspect the card edges. Drag the extended art under the fixed card zone or use
    the zoom slider, mouse wheel, arrow keys, or nudge buttons for fine alignment.
-8. Lower **Card opacity** or turn on **Difference** to compare boundaries.
-9. Set **Corner roundness** from 0 to 6 mm. The default 3 mm produces rounded
+9. Lower **Card opacity** or turn on **Difference** to compare boundaries.
+10. Set **Corner roundness** from 0 to 6 mm. The default 3 mm produces rounded
    insert PNGs and matching rounded cut guides while preserving the continuous master.
-10. **Print card in center** is on by default. Turn it off when the customer will
-    place the physical card in the center pocket instead.
-11. Select **Create print package**, then download the completed deliverable.
+11. For PSA, **Print card in center** defaults off. The cut-ready PDF leaves
+    the card chamber and top PSA label chamber white to save ink, with dotted guides.
+12. For PSA, keep the measured-fit 69.85 × 21.59 mm label cutout or enter the
+    width and height measured from the target slab in the right panel.
+13. Under **Package contents**, optionally add piece PNGs, the 300-DPI master PNG,
+    or the full-art PDF. These three extras are off by default.
+14. Select **Create print package**, then download the completed deliverable.
 
-The browser studio creates the exact Standard master (2,232 x 3,118 px at
-300 DPI), nine 744 x 1,039 px inserts, cut-ready PDFs, full-art PDFs, reports,
-instructions, and a ZIP. The aligned package is also saved in
+Use **Change setup** in the top bar to switch product or paper without reloading.
+Changing the product resets zoom and X/Y alignment because the canvas geometry
+has changed; uploaded source previews remain available.
+
+The top bar must show **v1.7.0** or newer.
+
+The browser studio defaults to the selected cut-ready PDF, matching print guide,
+reports, instructions, and ZIP. Piece PNGs, the master PNG, and the full-art PDF
+are included only when selected. The aligned package is also saved in
 **`READY_PRODUCTS`**, so closing the browser does not lose it.
 
 ### How auto alignment works
 
 The matcher stays offline and compares grayscale structure, edges, and broad color
-across several likely card-art regions. It searches zoom and X/Y position from
+across several likely card-art regions. It searches the card zone defined by
+the selected physical product, then searches zoom and X/Y position from
 coarse to fine, applies the strongest match, and reports confidence instead of
 silently claiming a perfect result. High confidence still needs a quick edge check.
 For medium confidence, use Difference and the nudge controls. Low confidence usually
 means the image generator redrew the subject or the card scan is cropped; treat the
 suggestion as a starting point and align manually.
 
-## Quick start: automatic drop folder
-
-1. Extract the complete workflow ZIP to a normal folder. Do not run it from
-   inside the ZIP viewer.
-2. Double-click **`START_AUTO_WORKFLOW.cmd`**. Leave the black workflow window
-   open.
-3. Copy a completed `.png`, `.jpg`, `.jpeg`, `.webp`, `.tif`, or `.tiff` image
-   into **`DROP_IMAGES_HERE`**.
-4. Wait until the workflow says `READY`.
-5. Open **`READY_PRODUCTS`**. The file ending in `_DELIVERABLE.zip` is the file
-   you can send to a customer.
-6. The original input is moved safely to **`PROCESSED_INPUTS`**.
-7. Press `Ctrl+C` in the workflow window when you want to stop watching.
-
-Nothing is uploaded. Multiple images may be dropped into the folder together;
-each image receives its own package and ZIP.
-
-## Quick start: process a batch once
-
-1. Put one or more images into **`DROP_IMAGES_HERE`**.
-2. Double-click **`PROCESS_ALL_NOW.cmd`**.
-3. Retrieve the finished ZIP files from **`READY_PRODUCTS`**.
-
-This mode closes after the current batch instead of staying open.
-
-## Quick start: drag directly onto the launcher
-
-Drag one or more completed images onto **`DROP_IMAGE_ON_THIS_FILE.cmd`**. The
-source images stay where they are, and the packages appear in
-**`READY_PRODUCTS`**.
+Image upload, alignment, product selection, paper selection, package options,
+and export all happen in the browser studio. Nothing is uploaded to the internet.
 
 ## What the automatic crop does
 
@@ -180,10 +194,7 @@ ExtendedArt_Offline_Workflow/
 ├── PROCESSED_INPUTS/       Successfully processed source images
 ├── FAILED_INPUTS/          Failed images and readable error reports
 ├── config.json             Default crop and output settings
-|-- START_ALIGNMENT_STUDIO.cmd  Recommended browser alignment workflow
-├── START_AUTO_WORKFLOW.cmd
-├── PROCESS_ALL_NOW.cmd
-└── DROP_IMAGE_ON_THIS_FILE.cmd
+└── ExtendedArtOffline.exe  Installed application engine
 ```
 
 Inside each customer ZIP:
@@ -238,6 +249,10 @@ Edit **`config.json`** while the watcher is stopped.
   "scale_mode": "fit",
   "safe_margin_mm": 4.0,
   "corner_radius_mm": 0.0,
+  "paper_format": "both",
+  "include_pieces": false,
+  "include_master": false,
+  "include_full_art_pdf": false,
   "keep_unzipped_package": true,
   "poll_seconds": 2.0,
   "settle_seconds": 3.0
@@ -249,6 +264,10 @@ Edit **`config.json`** while the watcher is stopped.
 - `source_mode`: use `crop` for edge-to-edge art; use `fit` only when white bars
   are preferable to cropping.
 - `profile`: `standard`, `vaultx`, or `both`. Standard is the default product.
+- Browser-only product profiles also include `psa` and `photo8x10`.
+- `paper_format`: `a4`, `letter`, or `both`. The automatic workflow defaults to both.
+- `include_pieces`, `include_master`, and `include_full_art_pdf`: optional extras;
+  all default to `false` so the package contains only required print files.
 - `corner_radius_mm`: `0` keeps square pieces; values up to `12` create rounded
   insert PNGs and rounded cut guides.
 - `keep_unzipped_package`: set to `false` if you want only ZIP files.
@@ -280,14 +299,61 @@ Change `profile` to `vaultx` or `both` to add 66 × 94 mm inserts. Use A4 for
 true-size Vault X-compatible output. Three 94 mm rows cannot fit on US Letter at
 100%, so the Letter PDF is automatically scaled and clearly reported.
 
+## PSA Slab and 8×10 notes
+
+The PSA mode targets the approximately 3.16 × 5.32 inch external envelope of a
+modern PSA card holder. Holder generations and third-party slab frames vary, so
+measure and test the exact physical product before advertising compatibility.
+The audited PSA opening contract is:
+
+- outer insert: **80.264 × 135.128 mm** / **948 × 1,596 px at 300 DPI**;
+- recommended label cutout: **69.85 × 21.59 mm** (2.75 × 0.85 in), centered,
+  with its top edge 5 mm from the insert;
+- card opening: **63 × 88 mm**, centered, with its top edge 36 mm from the insert.
+
+PSA publishes the 3.16 × 5.32 inch outer size but not an engineering drawing for
+the internal paper label. The default is a measured-fit overlay cutout,
+equivalent to 825 × 255 pixels at 300 DPI, with clearance around an approximately
+68.6 × 20.3 mm label. In PSA mode, change **PSA label cutout** width and height
+in the right panel for a measured genuine or aftermarket slab. Always print the
+calibration guide and test one physical slab generation before sale.
+Official references: [PSA holder dimensions](https://www.psacard.com/articles/articleview/10838/https%3A/images.ctfassets.net/l40e281thfxr/3wy7YSCujUEOK9OcflcQbi/46249989f24168c2aac7c687bfa49d1d/PSA_IG_T1_Holders_01__1_-1-.jpg),
+[PSA 2024 holder update](https://www.psacard.com/articles/articleview/11060/public/public/locales),
+and [PSA label/holder security](https://www.psacard.com/Security).
+The PSA cut-ready PDF always leaves the top label chamber white. When
+**Print card in center** is off (the PSA default), the card chamber is white
+too. The slab edge, label chamber, and card chamber use dotted cutting guides.
+This is the recommended ink-saving customer file. The master PNG, piece PNG,
+and full-art PDF are optional reference assets and do not replace the
+`psa_<paper>_cut_ready.pdf`.
+
+
+An 8 × 10 inch print fits US Letter at exact size with the default safe margin.
+On A4, the printable layout is slightly too wide once the safe margin is added,
+so the cut-ready PDF scales to **99.4094%** and records the percentage in its
+manifest and quality report. Frame mode now uses a visible mat-and-frame surround
+on the alignment canvas; this is a preview treatment and is not printed into the art.
+
 ## Source-code setup
 
-The release includes `ExtendedArtOffline.exe`, so customers do not need Python.
-If you intentionally remove the executable and want to run from source:
+The installer includes `ExtendedArtOffline.exe`, so customers do not need Python.
+To run from source:
 
 1. Install Python 3.12 or newer.
-2. Double-click **`SETUP_PYTHON_VERSION.cmd`** once while internet access is
+2. Run `python -m pip install -r requirements.txt` once while internet access is
    available to install Pillow and ReportLab.
-3. After setup, the source version can run offline.
+3. Run `python app/drop_workflow.py web`. The source version then runs offline.
+
+To build the Windows release, install `requirements-build.txt`, run
+`pyinstaller --noconfirm --clean ExtendedArtOffline.spec`, then compile
+`installer/ExtendedArt.iss` with Inno Setup 6. The installer is written to
+`release/ExtendedArt-Setup-v1.7.0.exe`.
 
 The packaged executable and the normal workflow make no network requests.
+
+## License
+
+The software source is available under the [MIT License](LICENSE). Game card
+artwork, characters, logos, and trademarks remain the property of their
+respective owners; users are responsible for securing rights to material they
+process or sell.

@@ -7,6 +7,12 @@
   "scale_mode": "fit",
   "safe_margin_mm": 4.0,
   "corner_radius_mm": 0.0,
+  "paper_format": "both",
+  "include_pieces": false,
+  "include_master": false,
+  "include_full_art_pdf": false,
+  "psa_label_width_mm": 69.85,
+  "psa_label_height_mm": 21.59,
   "keep_unzipped_package": true,
   "poll_seconds": 2.0,
   "settle_seconds": 3.0

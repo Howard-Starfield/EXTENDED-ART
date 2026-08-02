@@ -8,6 +8,8 @@ import mimetypes
 import shutil
 import sys
 import threading
+import urllib.error
+import urllib.request
 import webbrowser
 from email.parser import BytesParser
 from email.policy import default
@@ -19,12 +21,19 @@ from urllib.parse import unquote
 from PIL import Image, ImageOps
 
 from drop_workflow import initialize, paths, unique_path, workflow_root, zip_directory
-from processor import BuildOptions, PROFILES, build_package, safe_slug
+from processor import (
+    BuildOptions,
+    PROFILES,
+    build_package,
+    calculate_page_layout,
+    normalized_box_to_mm,
+    safe_slug,
+)
+from version import APP_VERSION
 
 MAX_REQUEST_BYTES = 220 * 1024 * 1024
 MAX_IMAGE_BYTES = 100 * 1024 * 1024
-APP_VERSION = "1.3.0"
-ALIGNMENT_PREVIEW = (180, 252)
+APP_ID = "extendedart-offline"
 ALIGNMENT_REGIONS = (
     ("Illustration panel", (0.08, 0.07, 0.92, 0.58)),
     ("Upper full art", (0.10, 0.10, 0.90, 0.75)),
@@ -63,8 +72,51 @@ def parse_multipart(content_type: str, body: bytes) -> tuple[dict, dict]:
     return fields, files
 
 
+def get_profile(name: str) -> object:
+    if name not in PROFILES:
+        raise ValueError("Choose a valid product mode.")
+    return PROFILES[name]
+
+
+def profile_payloads() -> dict:
+    return {
+        name: {
+            "name": profile.name,
+            "label": profile.label,
+            "description": profile.description,
+            "grid": [profile.columns, profile.rows],
+            "piece_count": profile.piece_count,
+            "insert_mm": [profile.insert_w_mm, profile.insert_h_mm],
+            "insert_px": list(profile.insert_px),
+            "master_mm": list(profile.master_mm),
+            "master_px": list(profile.master_px),
+            "card_box": list(profile.card_box),
+            "label_box": list(profile.label_box) if profile.label_box else None,
+            "card_box_mm": normalized_box_to_mm(profile, profile.card_box),
+            "label_box_mm": (
+                normalized_box_to_mm(profile, profile.label_box)
+                if profile.label_box is not None
+                else None
+            ),
+            "paper_fit": {
+                paper: calculate_page_layout(profile, paper)
+                for paper in ("a4", "letter")
+            },
+            "recommended_corner_radius_mm": profile.recommended_corner_radius_mm,
+        }
+        for name, profile in PROFILES.items()
+    }
+
+
+def alignment_preview_size(profile) -> tuple[int, int]:
+    height = 252
+    width = max(120, round(height * profile.master_px[0] / profile.master_px[1]))
+    return width, height
+
+
 def render_alignment(
     source: Image.Image,
+    profile_name: str,
     zoom: float,
     offset_x: float,
     offset_y: float,
@@ -73,7 +125,7 @@ def render_alignment(
         raise ValueError("Zoom must be between 100% and 400%.")
     if not -1.0 <= offset_x <= 1.0 or not -1.0 <= offset_y <= 1.0:
         raise ValueError("Artwork position is outside the allowed range.")
-    profile = PROFILES["standard"]
+    profile = get_profile(profile_name)
     source = ImageOps.exif_transpose(source).convert("RGB")
     target_w, target_h = profile.master_px
     scale = max(target_w / source.width, target_h / source.height) * zoom
@@ -169,11 +221,12 @@ def _signature_score(
 
 def _render_alignment_preview(
     source: Image.Image,
+    target_size: tuple[int, int],
     zoom: float,
     offset_x: float,
     offset_y: float,
 ) -> tuple[Image.Image, float, float]:
-    target_w, target_h = ALIGNMENT_PREVIEW
+    target_w, target_h = target_size
     scale = max(target_w / source.width, target_h / source.height) * zoom
     rendered_w = max(target_w, round(source.width * scale))
     rendered_h = max(target_h, round(source.height * scale))
@@ -182,7 +235,7 @@ def _render_alignment_preview(
     top = round((target_h - rendered_h) / 2 + offset_y * target_h)
     left = min(0, max(target_w - rendered_w, left))
     top = min(0, max(target_h - rendered_h, top))
-    preview = Image.new("RGB", ALIGNMENT_PREVIEW)
+    preview = Image.new("RGB", target_size)
     preview.paste(rendered, (left, top))
     effective_x = (left - (target_w - rendered_w) / 2) / target_w
     effective_y = (top - (target_h - rendered_h) / 2) / target_h
@@ -190,20 +243,28 @@ def _render_alignment_preview(
 
 
 
-def suggest_alignment(source: Image.Image, card: Image.Image) -> dict:
+def suggest_alignment(source: Image.Image, card: Image.Image, profile_name: str) -> dict:
     """Suggest artwork zoom and position using robust, model-free visual matching."""
     source = ImageOps.exif_transpose(source).convert("RGB")
     card = ImageOps.exif_transpose(card).convert("RGB")
+    profile = get_profile(profile_name)
     if source.width < 300 or source.height < 300:
         raise ValueError("The extended artwork is too small to auto align.")
     if card.width < 120 or card.height < 160:
         raise ValueError("The original card image is too small to auto align.")
 
-    source.thumbnail((900, 1260), Image.Resampling.LANCZOS)
-    cell_w = ALIGNMENT_PREVIEW[0] // 3
-    cell_h = ALIGNMENT_PREVIEW[1] // 3
-    center_box = (cell_w, cell_h, cell_w * 2, cell_h * 2)
-    fitted_card = ImageOps.fit(card, (cell_w, cell_h), Image.Resampling.LANCZOS)
+    preview_size = alignment_preview_size(profile)
+    source.thumbnail((preview_size[0] * 5, preview_size[1] * 5), Image.Resampling.LANCZOS)
+    left, top, right, bottom = profile.card_box
+    card_box = (
+        round(left * preview_size[0]),
+        round(top * preview_size[1]),
+        round(right * preview_size[0]),
+        round(bottom * preview_size[1]),
+    )
+    card_w = card_box[2] - card_box[0]
+    card_h = card_box[3] - card_box[1]
+    fitted_card = ImageOps.fit(card, (card_w, card_h), Image.Resampling.LANCZOS)
     card_signatures = {
         label: _image_signature(_crop_region(fitted_card, region))
         for label, region in ALIGNMENT_REGIONS
@@ -223,9 +284,9 @@ def suggest_alignment(source: Image.Image, card: Image.Image) -> dict:
             for offset_y in offsets_y:
                 for offset_x in offsets_x:
                     preview, effective_x, effective_y = _render_alignment_preview(
-                        source, zoom, offset_x, offset_y
+                        source, preview_size, zoom, offset_x, offset_y
                     )
-                    center = preview.crop(center_box)
+                    center = preview.crop(card_box)
                     for label, region in ALIGNMENT_REGIONS:
                         signature = _image_signature(_crop_region(center, region))
                         score = _signature_score(card_signatures[label], signature)
@@ -264,15 +325,20 @@ def suggest_alignment(source: Image.Image, card: Image.Image) -> dict:
         "quality": quality,
         "matched_region": best["matched_region"],
         "method": "offline_multiregion_visual_match",
+        "profile": profile.name,
     }
 
 
 
-def add_center_card(master: Image.Image, card: Image.Image) -> tuple[Image.Image, dict]:
+def add_center_card(master: Image.Image, card: Image.Image, profile) -> tuple[Image.Image, dict]:
     card = ImageOps.exif_transpose(card).convert("RGBA")
-    x_edges = [round(i * master.width / 3) for i in range(4)]
-    y_edges = [round(i * master.height / 3) for i in range(4)]
-    box = (x_edges[1], y_edges[1], x_edges[2], y_edges[2])
+    left, top, right, bottom = profile.card_box
+    box = (
+        round(left * master.width),
+        round(top * master.height),
+        round(right * master.width),
+        round(bottom * master.height),
+    )
     size = (box[2] - box[0], box[3] - box[1])
     fitted = ImageOps.fit(card, size, Image.Resampling.LANCZOS, centering=(0.5, 0.5))
     result = master.copy()
@@ -280,6 +346,7 @@ def add_center_card(master: Image.Image, card: Image.Image) -> tuple[Image.Image
     return result, {
         "included_in_master": True,
         "source_pixels": [card.width, card.height],
+        "card_box_px": list(box),
         "center_cell_box_px": list(box),
         "center_cell_pixels": list(size),
     }
@@ -304,6 +371,21 @@ def annotate_reports(result: dict, provenance: dict, warnings: list[str]) -> Non
         instructions.write_text(previous + notes + "\n", encoding="utf-8")
 
 
+def boolean_setting(settings: dict, name: str, default_value: bool = False) -> bool:
+    value = settings.get(name, default_value)
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"true", "1", "yes", "on"}:
+            return True
+        if normalized in {"false", "0", "no", "off", ""}:
+            return False
+    if isinstance(value, (int, float)) and value in {0, 1}:
+        return bool(value)
+    raise ValueError(f"{name} must be true or false")
+
+
 def process_web_job(
     root: Path,
     art_path: Path,
@@ -314,23 +396,34 @@ def process_web_job(
     zoom = float(settings.get("zoom", 1.0))
     offset_x = float(settings.get("offset_x", 0.0))
     offset_y = float(settings.get("offset_y", 0.0))
-    include_card = bool(settings.get("include_card", True))
+    include_card = boolean_setting(settings, "include_card")
+    include_pieces = boolean_setting(settings, "include_pieces")
+    include_master = boolean_setting(settings, "include_master")
+    include_full_art_pdf = boolean_setting(settings, "include_full_art_pdf")
     corner_radius_mm = float(settings.get("corner_radius_mm", 3.0))
+    psa_label_width_mm = float(settings.get("psa_label_width_mm", 69.85))
+    psa_label_height_mm = float(settings.get("psa_label_height_mm", 21.59))
+    profile_name = str(settings.get("profile", "standard"))
+    paper_format = str(settings.get("paper_format", "a4"))
+    profile = get_profile(profile_name)
+    cutout_card_zone = profile.name == "psa" and not include_card
+    if paper_format not in {"a4", "letter"}:
+        raise ValueError("Choose A4 or US Letter paper.")
     slug = safe_slug(str(settings.get("name") or art_path.stem))
     job_dir = unique_path(locations["work"], f"web-job-{slug}")
     job_dir.mkdir(parents=True)
-    package_name = f"{slug}_ALIGNED_DELIVERABLE"
+    package_name = f"{slug}_{profile_name}_{paper_format}_ALIGNED_DELIVERABLE"
     package_work = job_dir / package_name
     package_work.mkdir()
     try:
         with Image.open(art_path) as source:
-            master, alignment = render_alignment(source, zoom, offset_x, offset_y)
+            master, alignment = render_alignment(source, profile_name, zoom, offset_x, offset_y)
         card_info = {"included_in_master": False}
         if include_card:
             if not card_path:
                 raise ValueError("Upload the original card before including it in the print.")
             with Image.open(card_path) as card:
-                master, card_info = add_center_card(master, card)
+                master, card_info = add_center_card(master, card, profile)
         aligned_path = job_dir / f"{slug}_aligned_master.png"
         master.save(aligned_path, format="PNG", dpi=(300, 300))
         provenance = {
@@ -338,6 +431,16 @@ def process_web_job(
             "center_card": card_info,
             "reference_card_uploaded": card_path is not None,
             "corner_radius_mm": corner_radius_mm,
+            "profile": profile_name,
+            "paper_format": paper_format,
+            "cutout_card_zone": cutout_card_zone,
+            "psa_label_cutout_mm": [psa_label_width_mm, psa_label_height_mm],
+            "included_outputs": {
+                "cut_ready_pdf": True,
+                "pieces": include_pieces,
+                "master_png": include_master,
+                "full_art_pdf": include_full_art_pdf,
+            },
         }
         warnings = []
         if alignment["render_scale"] > 1.001:
@@ -345,11 +448,18 @@ def process_web_job(
                 f"Original artwork was enlarged {alignment['render_scale']:.2f}x; inspect fine detail."
             )
         if include_card:
-            warnings.append("The uploaded card image was printed into the center piece.")
+            warnings.append("The uploaded card image was printed into the selected card zone.")
         options = BuildOptions(
-            profile="standard",
+            profile=profile_name,
             source_mode="crop",
             corner_radius_mm=corner_radius_mm,
+            paper_format=paper_format,
+            include_pieces=include_pieces,
+            include_master=include_master,
+            include_full_art_pdf=include_full_art_pdf,
+            cutout_card_zone=cutout_card_zone,
+            psa_label_width_mm=psa_label_width_mm,
+            psa_label_height_mm=psa_label_height_mm,
         )
         result = build_package(aligned_path, package_work, slug=slug, options=options)
         annotate_reports(result, provenance, warnings)
@@ -407,7 +517,24 @@ class AlignmentHandler(BaseHTTPRequestHandler):
             self.serve_asset("index.html")
             return
         if route == "/api/health":
-            self.send_json(200, {"ok": True, "version": APP_VERSION, "offline": True})
+            self.send_json(
+                200,
+                {
+                    "ok": True,
+                    "app_id": APP_ID,
+                    "version": APP_VERSION,
+                    "offline": True,
+                    "profiles": profile_payloads(),
+                    "papers": {
+                        "a4": {"name": "a4", "label": "A4", "size_mm": [210.0, 297.0]},
+                        "letter": {
+                            "name": "letter",
+                            "label": "US Letter",
+                            "size_mm": [215.9, 279.4],
+                        },
+                    },
+                },
+            )
             return
         if route.startswith("/downloads/"):
             filename = Path(route.removeprefix("/downloads/")).name
@@ -431,6 +558,10 @@ class AlignmentHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         route = unquote(self.path.split("?", 1)[0])
+        if route == "/api/shutdown":
+            self.send_json(200, {"ok": True, "message": "ExtendedArt is closing."})
+            threading.Thread(target=self.server.shutdown, daemon=True).start()
+            return
         if route not in {"/api/auto-align", "/api/export"}:
             self.send_error(404)
             return
@@ -443,7 +574,7 @@ class AlignmentHandler(BaseHTTPRequestHandler):
                 raise ValueError("Expected a multipart upload.")
             fields, files = parse_multipart(content_type, self.rfile.read(length))
             if "art" not in files:
-                raise ValueError("Upload the 3x3 extended artwork first.")
+                raise ValueError("Upload the extended artwork first.")
             for filename, payload in files.values():
                 if len(payload) > MAX_IMAGE_BYTES:
                     raise ValueError(f"{filename} is larger than 100 MB.")
@@ -453,7 +584,7 @@ class AlignmentHandler(BaseHTTPRequestHandler):
                 with Image.open(BytesIO(files["art"][1])) as source, Image.open(
                     BytesIO(files["card"][1])
                 ) as card:
-                    alignment = suggest_alignment(source, card)
+                    alignment = suggest_alignment(source, card, fields.get("profile", "standard"))
                 self.send_json(200, {"ok": True, "alignment": alignment})
                 return
             settings = json.loads(fields.get("settings", "{}"))
@@ -491,7 +622,35 @@ class AlignmentHandler(BaseHTTPRequestHandler):
             self.send_json(400, {"ok": False, "error": str(error)})
 
 
+def existing_instance_url(port: int) -> str | None:
+    url = f"http://127.0.0.1:{port}"
+    try:
+        with urllib.request.urlopen(f"{url}/api/health", timeout=0.6) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except (OSError, ValueError, urllib.error.URLError):
+        return None
+    return url if payload.get("app_id") == APP_ID else None
+
+
+def request_shutdown(port: int = 8765) -> int:
+    request = urllib.request.Request(
+        f"http://127.0.0.1:{port}/api/shutdown",
+        data=b"",
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=2.0) as response:
+            return 0 if response.status == 200 else 1
+    except (OSError, urllib.error.URLError):
+        return 0
+
+
 def serve(root: Path, port: int = 8765, open_browser: bool = True) -> int:
+    running_url = existing_instance_url(port)
+    if running_url:
+        if open_browser:
+            webbrowser.open(running_url)
+        return 0
     initialize(root)
     handler = type("ConfiguredAlignmentHandler", (AlignmentHandler,), {})
     handler.root = root
