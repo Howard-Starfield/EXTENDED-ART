@@ -1,0 +1,12 @@
+This workflow uses the following open-source packages when run from source or
+when bundled into ExtendedArtOffline.exe:
+
+- Pillow (PIL Software License / HPND-style license)
+  https://python-pillow.github.io/
+- ReportLab Open Source (BSD license)
+  https://www.reportlab.com/dev/docs/
+- PyInstaller is used to build the Windows executable (GPL with an exception
+  permitting distribution of bundled applications)
+  https://pyinstaller.org/
+
+Review the packages' full license files before redistributing the executable.

@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ExtendedArt Alignment Studio</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23171b1d'/%3E%3Crect x='7' y='5' width='18' height='22' fill='none' stroke='%232aa9b8' stroke-width='2'/%3E%3Cpath d='M8 23 24 9' stroke='%23f26345' stroke-width='2'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="setup-open">
+  <div class="launch-gate" id="launchGate" role="dialog" aria-modal="true" aria-labelledby="launchTitle">
+    <div class="launch-surface">
+      <header class="launch-heading">
+        <span class="launch-index">EA / 01</span>
+        <div>
+          <p class="launch-kicker">New print setup</p>
+          <h1 id="launchTitle">What are we making today?</h1>
+          <p>Choose the physical object first. Every crop, guide and export will follow it.</p>
+        </div>
+        <span class="launch-offline"><i></i> Browser local</span>
+      </header>
+
+      <form class="setup-form" id="setupForm">
+        <fieldset class="mode-fieldset">
+          <legend><span>01</span> Choose the object</legend>
+          <div class="mode-grid">
+            <label class="mode-card">
+              <input type="radio" name="profile" value="standard" checked>
+              <span class="mode-figure grid-figure" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
+              <span class="mode-copy"><strong>Standard 3&times;3</strong><small>63 &times; 88 mm pockets</small></span>
+              <span class="mode-tag">9 inserts</span>
+            </label>
+
+            <label class="mode-card">
+              <input type="radio" name="profile" value="vaultx">
+              <span class="mode-figure grid-figure vault-figure" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
+              <span class="mode-copy"><strong>Vault Binder</strong><small>66 &times; 94 mm pockets</small></span>
+              <span class="mode-tag">9 inserts</span>
+            </label>
+
+            <label class="mode-card">
+              <input type="radio" name="profile" value="psa">
+              <span class="mode-figure slab-figure" aria-hidden="true"><i class="slab-label"></i><i class="slab-card"></i></span>
+              <span class="mode-copy"><strong>PSA Slab</strong><small>3.16 &times; 5.32 in</small></span>
+              <span class="mode-tag">1 insert</span>
+            </label>
+
+            <label class="mode-card">
+              <input type="radio" name="profile" value="photo8x10">
+              <span class="mode-figure frame-figure" aria-hidden="true"><i></i></span>
+              <span class="mode-copy"><strong>8&times;10 Photo Frame</strong><small>Display print</small></span>
+              <span class="mode-tag">1 print</span>
+            </label>
+          </div>
+        </fieldset>
+
+        <aside class="sheet-panel">
+          <fieldset class="paper-fieldset">
+            <legend><span>02</span> Choose the sheet</legend>
+            <div class="paper-options">
+              <label class="paper-card">
+                <input type="radio" name="paper" value="a4" checked>
+                <span class="paper-shape a4-paper" aria-hidden="true"><i></i></span>
+                <span><strong>A4</strong><small>210 &times; 297 mm</small></span>
+              </label>
+              <label class="paper-card">
+                <input type="radio" name="paper" value="letter">
+                <span class="paper-shape letter-paper" aria-hidden="true"><i></i></span>
+                <span><strong>US Letter</strong><small>8.5 &times; 11 in</small></span>
+              </label>
+            </div>
+          </fieldset>
+
+          <div class="setup-summary" aria-live="polite">
+            <span>Production ticket</span>
+            <strong id="setupSummaryName">Standard 3&times;3 Binder</strong>
+            <dl>
+              <div><dt>Master</dt><dd id="setupSummaryPixels">2232 &times; 3118 px</dd></div>
+              <div><dt>Finished</dt><dd id="setupSummarySize">189 &times; 264 mm</dd></div>
+              <div><dt>Package</dt><dd id="setupSummaryPackage">9 inserts + A4 PDF</dd></div>
+            </dl>
+          </div>
+
+          <button class="start-studio-button" id="startStudioButton" type="submit">
+            <span>Open alignment studio</span><b aria-hidden="true">&rarr;</b>
+          </button>
+          <p class="setup-footnote">Your images never leave this computer.</p>
+        </aside>
+      </form>
+    </div>
+  </div>
+
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <div>
+        <strong>ExtendedArt</strong>
+        <span>Alignment Studio</span>
+      </div>
+    </div>
+    <div class="topbar-meta">
+      <button class="change-setup-button" id="changeSetupButton" type="button">Change setup</button>
+      <button class="change-setup-button exit-app-button" id="exitAppButton" type="button">Reset session</button>
+      <span class="spec" id="activeSpec">Standard 3&times;3 | 2232 &times; 3118 px | A4 | 300 DPI</span>
+      <span class="version" id="appVersion">web draft</span>
+      <span class="offline"><i></i> Browser local</span>
+    </div>
+  </header>
+
+  <main class="studio-shell">
+    <aside class="rail upload-rail" aria-label="Source images">
+      <div class="rail-heading">
+        <span class="step">01</span>
+        <div><p>Load sources</p><small>Both files stay on this computer</small></div>
+      </div>
+
+      <label class="drop-card primary-drop" id="artDrop">
+        <input id="artInput" type="file" accept="image/png,image/jpeg,image/webp">
+        <span class="drop-topline"><strong id="artDropTitle">Extended 3&times;3 artwork</strong><span class="input-required">Required</span></span>
+        <span class="drop-visual"><span class="drop-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="4" width="18" height="16"/><circle cx="8.5" cy="9" r="1.6"/><path d="m4.5 18 5.1-5.1 3.3 3.3 2.1-2.1 4.5 4.5"/></svg></span><img class="image-preview" id="artPreview" alt="Extended artwork preview" hidden></span>
+        <span class="drop-copy" id="artDropCopy">Drop or choose the Image 2 result</span>
+        <span class="file-details" id="artMeta">Required | PNG, JPG or WebP</span>
+      </label>
+
+      <label class="drop-card" id="cardDrop">
+        <input id="cardInput" type="file" accept="image/png,image/jpeg,image/webp">
+        <span class="drop-topline"><strong>Original game card</strong></span>
+        <span class="drop-visual"><span class="drop-icon card-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="4" y="2.5" width="16" height="19"/><path d="M4 7h16"/><circle cx="9" cy="12" r="2"/><path d="M6.2 18c.7-2 2-3 3.8-3s3.1 1 3.8 3M15 10h2.5M15 13h2.5"/></svg></span><img class="image-preview" id="cardPreview" alt="Original game card preview" hidden></span>
+        <span class="drop-copy">Used as the locked center reference</span>
+        <span class="file-details" id="cardMeta">Recommended for precise alignment</span>
+      </label>
+
+      <button class="auto-align-button" id="autoAlignButton" type="button" disabled>
+        <span class="auto-align-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="6.5"/><circle cx="12" cy="12" r="2"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg></span>
+        <span><strong>Center-fit artwork</strong><small>Set a clean local starting point</small></span>
+      </button>
+      <p class="auto-align-status" id="autoAlignStatus" role="status" aria-live="polite" hidden></p>
+
+      <div class="method-note">
+        <span>How it works</span>
+        <p id="methodCopy">The center card stays fixed. Drag the extended artwork underneath it until colors, shapes and perspective meet at the card edges.</p>
+      </div>
+    </aside>
+
+    <section class="workspace" aria-label="Alignment canvas">
+      <div class="workspace-heading">
+        <div class="workspace-title"><span class="step">02</span><p>Align the scene</p></div>
+        <div class="view-tools" role="group" aria-label="Preview and paper options">
+          <button class="tool-button active" id="gridToggle" type="button" aria-pressed="true">Grid</button>
+          <button class="tool-button active" id="cardToggle" type="button" aria-pressed="true">Card</button>
+          <button class="tool-button" id="differenceToggle" type="button" aria-pressed="false">Difference</button>
+          <span class="tool-divider" aria-hidden="true"></span>
+          <button class="tool-button paper-tool active" id="a4PaperTool" type="button" aria-pressed="true" title="A4: 210 × 297 mm">
+            <i class="paper-tool-icon a4-icon" aria-hidden="true"></i>
+            <span>A4<small id="a4Fit">100%</small></span>
+          </button>
+          <button class="tool-button paper-tool" id="letterPaperTool" type="button" aria-pressed="false" title="US Letter: 215.9 × 279.4 mm">
+            <i class="paper-tool-icon letter-icon" aria-hidden="true"></i>
+            <span>Letter<small id="letterFit">100%</small></span>
+          </button>
+        </div>
+      </div>
+
+      <div class="light-table">
+        <div class="ruler ruler-x" id="rulerX"><span>0</span><span>63</span><span>126</span><span>189 mm</span></div>
+        <div class="ruler ruler-y" id="rulerY"><span>0</span><span>88</span><span>176</span><span>264</span></div>
+        <div class="canvas-shell" id="canvasShell" tabindex="0">
+          <canvas id="alignmentCanvas"></canvas>
+          <span class="frame-mode-badge" id="frameModeBadge" hidden>8 × 10 frame preview</span>
+          <div class="empty-state" id="emptyState">
+            <span class="empty-grid" aria-hidden="true"></span>
+            <strong>Place your extended artwork</strong>
+            <p id="emptyStateCopy">Drop the full 3&times;3 image on the left to begin.</p>
+          </div>
+          <span class="registration top-left" aria-hidden="true"></span>
+          <span class="registration top-right" aria-hidden="true"></span>
+          <span class="registration bottom-left" aria-hidden="true"></span>
+          <span class="registration bottom-right" aria-hidden="true"></span>
+          <div class="canvas-caption" aria-label="Alignment controls">
+            <span><kbd>Drag</kbd> move</span>
+            <span><kbd>Wheel</kbd> zoom</span>
+            <span><kbd>Arrows</kbd> 1 px</span>
+            <span><kbd>Shift</kbd> + arrows 10 px</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <aside class="rail control-rail" aria-label="Alignment controls">
+      <div class="rail-heading">
+        <span class="step">03</span>
+        <div><p>Refine & export</p><small>Use the card edges as your guide</small></div>
+      </div>
+
+      <div class="control-block">
+        <label for="zoomRange"><span>Artwork zoom</span><output id="zoomValue">100%</output></label>
+        <input id="zoomRange" type="range" min="100" max="250" value="100" step="1">
+      </div>
+
+      <div class="control-block">
+        <label for="opacityRange"><span>Card opacity</span><output id="opacityValue">72%</output></label>
+        <input id="opacityRange" type="range" min="0" max="100" value="72" step="1">
+      </div>
+
+      <div class="control-block">
+        <label for="radiusRange"><span>Corner roundness</span><output id="radiusValue">3 mm</output></label>
+        <input id="radiusRange" type="range" min="0" max="6" value="3" step="0.5">
+      </div>
+
+      <div class="control-block psa-label-controls" id="psaLabelControls" hidden>
+        <div class="psa-label-heading"><strong>PSA label cutout</strong><span>Measured-fit default</span></div>
+        <div class="dimension-inputs">
+          <label for="psaLabelWidth"><span>Width</span><input id="psaLabelWidth" type="number" min="40" max="76" step="0.01" value="69.85"><small>mm</small></label>
+          <label for="psaLabelHeight"><span>Height</span><input id="psaLabelHeight" type="number" min="10" max="30" step="0.01" value="21.59"><small>mm</small></label>
+        </div>
+        <small class="dimension-hint">2.75 × 0.85 in · 825 × 255 px at 300 DPI</small>
+      </div>
+
+      <div class="control-block nudge-block">
+        <label><span>Precision nudge</span><output id="offsetValue">X 0 / Y 0</output></label>
+        <div class="nudge-pad">
+          <button type="button" data-nudge="0,-1" aria-label="Move up">&uarr;</button>
+          <button type="button" data-nudge="-1,0" aria-label="Move left">&larr;</button>
+          <button type="button" id="resetButton" aria-label="Reset alignment">C</button>
+          <button type="button" data-nudge="1,0" aria-label="Move right">&rarr;</button>
+          <button type="button" data-nudge="0,1" aria-label="Move down">&darr;</button>
+        </div>
+      </div>
+
+      <label class="check-row">
+        <input id="includeCard" type="checkbox" checked>
+        <span><strong>Print card in center</strong><small id="includeCardHelp">Turn off when the real card will go in the binder.</small></span>
+      </label>
+
+      <div class="package-options" aria-labelledby="packageOptionsTitle">
+        <div class="package-options-heading">
+          <strong id="packageOptionsTitle">Package contents</strong>
+          <small>Ink-saving PDF is always included</small>
+        </div>
+        <label class="package-option required-output">
+          <input type="checkbox" checked disabled>
+          <span><strong>Cut-ready PDF</strong><small id="cutReadyOutputHelp">Dotted cut guides + blank PSA chambers</small></span>
+        </label>
+        <label class="package-option">
+          <input id="includePieces" type="checkbox">
+          <span><strong>Piece PNGs</strong><small>Individual finished inserts</small></span>
+        </label>
+        <label class="package-option">
+          <input id="includeMaster" type="checkbox">
+          <span><strong>Master PNG</strong><small>Full 300-DPI artwork</small></span>
+        </label>
+        <label class="package-option">
+          <input id="includeFullArtPdf" type="checkbox">
+          <span><strong>Full-art PDF</strong><small>Artwork without cutout guides</small></span>
+        </label>
+      </div>
+
+      <button class="export-button" id="exportButton" type="button" disabled>
+        <span>Browser export engine</span>
+        <small id="exportButtonCopy">PDF + ZIP parity is the next milestone</small>
+      </button>
+
+      <div class="result-panel" id="resultPanel" hidden>
+        <span class="result-kicker">Package ready</span>
+        <strong id="resultName"></strong>
+        <p id="resultNotes"></p>
+        <a class="download-button" id="downloadButton" href="#">Download ZIP</a>
+      </div>
+
+      <div class="quality-strip">
+        <span>Output contract</span>
+        <dl>
+          <div><dt>Master</dt><dd id="masterContract">2232 &times; 3118</dd></div>
+          <div><dt id="pieceContractLabel">Insert</dt><dd id="pieceContract">744 &times; 1039</dd></div>
+          <div><dt>Print</dt><dd id="paperContract">A4 / 300 DPI</dd></div>
+        </dl>
+      </div>
+    </aside>
+  </main>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="app.js"></script>
+</body>
+</html>
