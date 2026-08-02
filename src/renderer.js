@@ -11,7 +11,7 @@ export function roundedRectPath(context, x, y, width, height, radius) {
   context.closePath();
 }
 
-function drawCover(context, image, width, height, state) {
+export function drawCover(context, image, width, height, state) {
   const size = imageSize(image);
   const base = Math.max(width / size.width, height / size.height);
   const scale = base * state.zoom;
@@ -115,7 +115,11 @@ export function drawAlignmentScene({ context, width, height, profile, state, art
 }
 
 export function drawArtworkProof({ context, width, height, state, artImage }) {
-  context.fillStyle = "#ffffff";
+  return drawMasterArtwork({ context, width, height, state, artImage });
+}
+
+export function drawMasterArtwork({ context, width, height, state, artImage, background = "#ffffff" }) {
+  context.fillStyle = background;
   context.fillRect(0, 0, width, height);
   if (!artImage) return { offsetX: state.offsetX, offsetY: state.offsetY };
   return drawCover(context, artImage, width, height, state);
