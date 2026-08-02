@@ -1,4 +1,5 @@
 import { imageSize } from "./state.js";
+import { getCutoutGeometry, internalGuideRect, normalizedBoxToPixels } from "./output-geometry.js";
 
 export function roundedRectPath(context, x, y, width, height, radius) {
   const r = Math.max(0, Math.min(radius, width / 2, height / 2));
@@ -68,29 +69,31 @@ export function drawAlignmentScene({ context, width, height, profile, state, art
     drawCardReference(context, cardImage, profile.card_box, width, height, cardRadius, state.opacity, state.difference);
   }
 
-  if (artImage && profile.name === "psa") {
-    const cutouts = [];
-    if (labelBox) cutouts.push(["PSA LABEL CUTOUT", labelBox, 2]);
-    if (!includeCard) cutouts.push(["CARD CUTOUT", profile.card_box, cardRadius]);
+  if (artImage && (profile.name === "psa" || profile.name === "photo8x10")) {
+    const cutouts = getCutoutGeometry(profile, {
+      labelBox,
+      cornerRadiusMm: state.cornerRadiusMm,
+    }).filter((cutout) => !(cutout.id === "CARD" && includeCard));
     context.save();
-    for (const [label, box, radius] of cutouts) {
-      const cutX = box[0] * width;
-      const cutY = box[1] * height;
-      const cutW = (box[2] - box[0]) * width;
-      const cutH = (box[3] - box[1]) * height;
-      roundedRectPath(context, cutX, cutY, cutW, cutH, radius);
-      const referenceVisible = label === "CARD CUTOUT" && cardImage && state.showCard;
+    for (const cutout of cutouts) {
+      const box = normalizedBoxToPixels(cutout.box, width, height);
+      const guide = internalGuideRect(box, { strokeWidthPx: 1.5 });
+      const cutRadius = (cutout.radiusMm / profile.master_mm[0]) * width;
+      const guideRadius = Math.max(0, cutRadius - (box.x - guide.x));
+      roundedRectPath(context, box.x, box.y, box.width, box.height, cutRadius);
+      const referenceVisible = cutout.id === "CARD" && cardImage && state.showCard;
       context.fillStyle = referenceVisible ? "rgba(255,255,255,.78)" : "rgba(255,255,255,.96)";
       context.fill();
       context.setLineDash([4, 3]);
-      context.strokeStyle = label === "PSA LABEL CUTOUT" ? "#f26345" : "#177884";
+      context.strokeStyle = cutout.id === "PSA_LABEL" ? "#f26345" : "#177884";
       context.lineWidth = 1.5;
+      roundedRectPath(context, guide.x, guide.y, guide.width, guide.height, guideRadius);
       context.stroke();
       context.setLineDash([]);
       context.fillStyle = "#4f595c";
       context.font = '700 8px "Cascadia Mono", monospace';
       context.textAlign = "center";
-      context.fillText(label, cutX + cutW / 2, cutY + Math.min(cutH / 2 + 3, 12));
+      context.fillText(cutout.label, box.x + box.width / 2, box.y + Math.min(box.height / 2 + 3, 12));
     }
     context.restore();
   }

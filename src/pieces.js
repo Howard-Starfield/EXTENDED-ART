@@ -1,5 +1,6 @@
 import { imageSize } from "./state.js";
 import { drawMasterArtwork, roundedRectPath } from "./renderer.js";
+import { getOutputMaskGeometry } from "./output-geometry.js";
 
 export const OUTPUT_DPI = 300;
 export const BINDER_POSITION_IDS = Object.freeze([
@@ -86,6 +87,48 @@ export function applyRoundedAlphaMask(context, width, height, radiusPx) {
   roundedRectPath(context, 0, 0, width, height, radiusPx);
   context.fill();
   context.restore();
+}
+
+export function applyCutoutMasks(context, width, height, profile, { labelBox = profile.label_box, cornerRadiusMm = 3 } = {}) {
+  const cutouts = getOutputMaskGeometry(profile, { labelBox, cornerRadiusMm });
+  for (const cutout of cutouts) {
+    const scaleX = width / profile.master_px[0];
+    const scaleY = height / profile.master_px[1];
+    const rect = {
+      x: cutout.pixels.x * scaleX,
+      y: cutout.pixels.y * scaleY,
+      width: cutout.pixels.width * scaleX,
+      height: cutout.pixels.height * scaleY,
+    };
+    const radius = mmToPixels(cutout.radiusMm) * Math.min(scaleX, scaleY);
+    context.save();
+    context.globalCompositeOperation = "source-over";
+    context.globalAlpha = 1;
+    context.fillStyle = "#ffffff";
+    roundedRectPath(context, rect.x, rect.y, rect.width, rect.height, radius);
+    context.fill();
+    context.restore();
+  }
+  return cutouts;
+}
+
+export function renderCutReadyPieceFromMaster({ masterCanvas, piece, profile, cornerRadiusMm, labelBox = profile.label_box, documentRef = globalThis.document, canvasFactory }) {
+  const canvas = renderPieceFromMaster({
+    masterCanvas,
+    piece,
+    profile,
+    cornerRadiusMm,
+    documentRef,
+    canvasFactory,
+  });
+  const context = canvas.getContext("2d", { alpha: true, colorSpace: "srgb" });
+  if (!context) throw new Error("The cut-ready piece canvas could not be created.");
+  if (piece.source.x === 0 && piece.source.y === 0
+    && piece.source.width === profile.master_px[0]
+    && piece.source.height === profile.master_px[1]) {
+    applyCutoutMasks(context, piece.output.width, piece.output.height, profile, { labelBox, cornerRadiusMm });
+  }
+  return canvas;
 }
 
 export function renderPieceFromMaster({ masterCanvas, piece, profile, cornerRadiusMm, documentRef = globalThis.document, canvasFactory }) {

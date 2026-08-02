@@ -2,11 +2,11 @@
 
 Status: Phase 2 in progress
 
-Gate record (2026-08-02): `npm.cmd run test` passes 25 tests, `npm.cmd run
+Gate record (2026-08-02): `npm.cmd run test` passes 29 tests, `npm.cmd run
 build` passes, and `npm.cmd run test:browser` passes all 3 browser tests,
 including worker-backed matching, progress locking, fallback messaging,
-deterministic master/piece geometry, correction, and proof-download flows. The
-browser project has not been published or pushed.
+deterministic master/piece geometry, PSA/frame/binder masks, correction, and
+proof-download flows. The browser project has not been published or pushed.
 
 Repository checkpoint: commit 0755713 contains the Phase 1 browser-local
 workflow; the Phase 1 hardening checkpoint is b58e40e. The Phase 2 matcher
@@ -638,7 +638,7 @@ small output that proves the scene model and preview are connected.
 
 ## Phase 2 - Deterministic image pipeline and reference matching
 
-Status: In progress; P2-01 through P2-05 are implemented in the current
+Status: In progress; P2-01 through P2-06 are implemented in the current
 working checkpoint
 
 Goal: Replace the center-fit placeholder with a real, explainable local image
@@ -746,7 +746,7 @@ correction. A timeout is not a low-confidence result.
       to the progress UI without allowing stale worker results.
 - [x] P2-05 Implement exact master rendering, rounded-edge slicing, canonical
       position ids, and the eight-piece binder print list.
-- [ ] P2-06 Implement PSA, 8x10, and binder chamber masks plus separate outer
+- [x] P2-06 Implement PSA, 8x10, and binder chamber masks plus separate outer
       and internal preview-guide geometry.
 - [ ] P2-07 Implement the quality report, effective-DPI calculations, alignment
       diagnostics, and version stamps.
@@ -759,7 +759,7 @@ correction. A timeout is not a low-confidence result.
       repeated colors, low contrast, and no-card scenes.
 - [ ] Generate reference JSON from the Python processor for every profile.
 - [ ] Compare browser master and piece dimensions to the reference contract.
-- [ ] Verify the PSA label box for default and custom dimensions.
+- [x] Verify the PSA label box for default and custom dimensions.
 - [ ] Verify guide clearance at the raster preview boundary.
 - [ ] Verify A4 and Letter page-fit math differs where the physical page differs.
 - [ ] Test source images below, equal to, and above the target pixel count.
