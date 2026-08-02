@@ -12,13 +12,14 @@
     <div class="launch-surface">
       <header class="launch-heading">
         <span class="launch-index">EA / 01</span>
-        <div>
+        <div class="launch-title-group">
           <p class="launch-kicker">New print setup</p>
           <h1 id="launchTitle">What are we making today?</h1>
-          <p>Choose the physical object first. Every crop, guide and export will follow it.</p>
         </div>
-        <span class="setup-step-label" id="setupStepLabel">Step 1 of 2</span>
-        <span class="launch-offline"><i></i> Browser local</span>
+        <div class="launch-meta">
+          <span class="setup-step-label" id="setupStepLabel">Step 1 of 2</span>
+          <span class="launch-offline"><i></i> Browser local</span>
+        </div>
       </header>
 
       <form class="setup-form" id="setupForm">
@@ -55,9 +56,6 @@
             </label>
           </div>
         </fieldset>
-        <button class="setup-next-button" id="continueSetupButton" type="button">
-          <span>Continue to sheet</span><b aria-hidden="true">&rarr;</b>
-        </button>
         </div>
 
         <aside class="sheet-panel setup-step-panel" id="setupPaperStep" hidden>

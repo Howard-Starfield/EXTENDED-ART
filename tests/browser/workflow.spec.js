@@ -79,7 +79,6 @@ test("auto-aligns after both required images decode", async ({ page }) => {
   const cardImage = solidPng(630, 880);
 
   await page.locator("label.mode-card").first().click();
-  await page.getByRole("button", { name: "Continue to sheet" }).click();
   await page.locator("label.paper-card").first().click();
   await page.getByRole("button", { name: "Open alignment studio" }).click();
   await expect(page.locator("#autoAlignButton")).toBeDisabled();

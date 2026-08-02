@@ -6,13 +6,23 @@ test("opens the local setup gate", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "What are we making today?" })).toBeVisible();
   await expect(page.getByText("Browser local").first()).toBeVisible();
   await expect(page.locator('input[name="profile"]:checked')).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Continue to sheet" })).toBeDisabled();
   await page.locator("label.mode-card").first().click();
-  await expect(page.getByRole("button", { name: "Continue to sheet" })).toBeEnabled();
-  await page.getByRole("button", { name: "Continue to sheet" }).click();
   await expect(page.getByRole("heading", { name: "Choose your paper size" })).toBeVisible();
   await expect(page.locator('input[name="paper"]:checked')).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Open alignment studio" })).toBeDisabled();
+});
+
+test("keeps the object and paper choices on the same centered axis", async ({ page }) => {
+  await page.setViewportSize({ width: 1200, height: 800 });
+  await page.goto("/");
+  const objectChoices = await page.locator(".mode-grid").boundingBox();
+  expect(objectChoices).not.toBeNull();
+
+  await page.locator("label.mode-card").first().click();
+  await expect(page.locator(".paper-options")).toBeVisible();
+  const paperChoices = await page.locator(".paper-options").boundingBox();
+  expect(paperChoices).not.toBeNull();
+  expect(Math.abs((objectChoices.x + objectChoices.width / 2) - (paperChoices.x + paperChoices.width / 2))).toBeLessThanOrEqual(2);
 });
 
 test("keeps a narrow laptop viewport free of persistent horizontal overflow", async ({ page }) => {

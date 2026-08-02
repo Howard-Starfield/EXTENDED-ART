@@ -66,8 +66,8 @@ function setRuler(element, total, divisions, suffix) {
 function updateSetupSummary() {
   const profileName = document.querySelector('input[name="profile"]:checked')?.value || state.profile;
   const paperName = document.querySelector('input[name="paper"]:checked')?.value || state.paper;
-  const profile = state.profiles[profileName] || fallbackProfiles[profileName];
-  const paper = state.papers[paperName] || fallbackPapers[paperName];
+  const profile = state.profiles[profileName] || fallbackProfiles[profileName] || fallbackProfiles.standard;
+  const paper = state.papers[paperName] || fallbackPapers[paperName] || fallbackPapers.a4;
   if (!(profile && paper)) return;
   $("#setupSummaryName").textContent = profile.label;
   $("#setupSummaryPixels").textContent = `${pixelPair(profile.master_px)} px`;
@@ -118,13 +118,7 @@ function updateSetupWizard() {
   $("#setupPaperStep").hidden = productStep;
   $("#setupStepLabel").textContent = productStep ? "Step 1 of 2" : "Step 2 of 2";
   $("#launchTitle").textContent = productStep ? "What are we making today?" : "Choose your paper size";
-  const description = $("#launchTitle").parentElement.querySelector("p:last-child");
-  description.textContent = productStep
-    ? "Choose the physical object first. Every crop, guide and export will follow it."
-    : "Pick the first sheet for this package. You can add the other paper size during final export.";
-  const selectedProduct = document.querySelector('input[name="profile"]:checked');
   const selectedPaper = document.querySelector('input[name="paper"]:checked');
-  $("#continueSetupButton").disabled = !selectedProduct;
   $("#startStudioButton").disabled = !selectedPaper;
 }
 
@@ -167,14 +161,13 @@ function updateStudioContract() {
 }
 
 function focusVisibleSetupControl() {
-  const control = state.setupStep === "product"
-    ? document.querySelector('input[name="profile"]:checked')
-    : document.querySelector('input[name="paper"]:checked');
+  const selector = state.setupStep === "product" ? 'input[name="profile"]' : 'input[name="paper"]';
+  const control = document.querySelector(`${selector}:checked`) || document.querySelector(selector);
   window.setTimeout(() => control?.focus(), 0);
 }
 
 function openSetup() {
-  state.setupStep = "product";
+  state.setupStep = state.profile ? "paper" : "product";
   const gate = $("#launchGate");
   document.querySelectorAll('input[name="profile"], input[name="paper"]').forEach((input) => {
     input.checked = input.name === "profile" ? input.value === state.profile : input.value === state.paper;
@@ -219,15 +212,13 @@ function applySetup(event) {
 
 document.querySelectorAll('input[name="profile"], input[name="paper"]').forEach((input) => {
   input.addEventListener("change", () => {
+    if (input.name === "profile" && state.setupStep === "product") {
+      state.setupStep = "paper";
+    }
     updateSetupSummary();
     updateSetupWizard();
+    if (input.name === "profile") focusVisibleSetupControl();
   });
-});
-$("#continueSetupButton").addEventListener("click", () => {
-  state.setupStep = "paper";
-  updateSetupSummary();
-  updateSetupWizard();
-  focusVisibleSetupControl();
 });
 $("#backSetupButton").addEventListener("click", () => {
   state.setupStep = "product";
