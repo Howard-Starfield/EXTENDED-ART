@@ -26,6 +26,7 @@ const state = createInitialState(fallbackProfiles, fallbackPapers);
 
 let toastTimer;
 let renderQueued = false;
+let exportController = null;
 const intakeGeneration = { art: 0, card: 0 };
 
 function activeProfile() {
@@ -83,7 +84,13 @@ function updateExportSummary() {
   ].filter(Boolean);
   $("#exportButtonCopy").textContent = selected.length
     ? `${selected.join(", ")} · final PDF + ZIP engine next`
-    : "Final PDF + ZIP engine is the next milestone";
+    : "Cut-ready PDF + print guide included";
+  $("#exportButtonCopy").textContent = selected.length
+    ? selected.join(", ") + " | cut-ready PDF + print guide included"
+    : "Cut-ready PDF + print guide included";
+  $("#exportButton").disabled = state.alignmentBusy
+    || state.exportBusy
+    || !(state.artImage && state.cardImage && state.lastCompletedJobId);
 }
 
 function updatePaperTools() {
@@ -334,6 +341,16 @@ function setProgressVisible(visible) {
   if (visible) window.setTimeout(() => $("#cancelAlignmentButton").focus(), 0);
 }
 
+function setExportProgress(event) {
+  $("#progressJob").textContent = "PKG";
+  $("#progressTitle").textContent = "Creating print package";
+  $("#progressMessage").textContent = "The controls are locked while exact-size PDFs and the ZIP are assembled locally.";
+  $("#progressStage").textContent = event.stage;
+  const roundedProgress = Math.max(0, Math.min(100, Math.round(event.progress || 0)));
+  $("#progressPercent").textContent = `${roundedProgress}%`;
+  $("#progressBar").style.width = `${roundedProgress}%`;
+}
+
 function showAlignmentProgress({ jobId, label, progress }) {
   $("#progressJob").textContent = `JOB ${String(jobId).padStart(4, "0")}`;
   $("#progressTitle").textContent = "Aligning locally";
@@ -397,6 +414,7 @@ const matcherRunner = createMatcherJobRunner({
     $("#autoAlignStatus").hidden = false;
     $("#proofButton").disabled = false;
     updateAutoAlignAvailability();
+    updateExportSummary();
     requestRender();
     window.setTimeout(() => $("#proofButton").focus(), 0);
     showToast(result.accepted ? "Reference match applied." : "No reliable match; center-fit baseline retained.");
@@ -463,6 +481,10 @@ async function startAlignment(reason = "both images ready") {
 }
 
 $("#cancelAlignmentButton").addEventListener("click", () => {
+  if (state.exportBusy) {
+    exportController?.abort();
+    return;
+  }
   if (!matcherRunner.cancel()) finishAlignmentCancel();
   $("#autoAlignButton").classList.remove("is-loading");
 });
@@ -507,6 +529,7 @@ async function loadFile(kind, file) {
     $("#autoAlignStatus").hidden = true;
     updateQualityNotice();
     updateAutoAlignAvailability();
+    updateExportSummary();
     requestRender();
     if (state.artImage && state.cardImage) {
       if (state.cardQuality?.blocksAlignment) {
@@ -708,11 +731,62 @@ $("#exitAppButton").addEventListener("click", () => {
       return;
     }
     updateExportSummary();
+    if (state.matcherDiagnostics) updateQualityReport();
   });
 });
-$("#exportButton").addEventListener("click", () => {
-  if (state.alignmentBusy) return;
-  showToast("Final PDF and ZIP export is scheduled for the next milestone.");
+$("#exportButton").addEventListener("click", async () => {
+  if (state.alignmentBusy || state.exportBusy) return;
+  if (!(state.artImage && state.cardImage && state.lastCompletedJobId)) return;
+  if (state.qualityReport?.overallStatus === "BLOCKED") {
+    showToast("Resolve the blocked source-quality warning before exporting.");
+    return;
+  }
+  state.exportBusy = true;
+  state.alignmentBusy = true;
+  exportController = new AbortController();
+  updateExportSummary();
+  setProgressVisible(true);
+  setExportProgress({ stage: "Preparing package", progress: 0 });
+  try {
+    const { createBrowserPrintPackage } = await import("./src/export.js");
+    const result = await createBrowserPrintPackage({
+      state,
+      profile: activeProfile(),
+      paper: activePaper(),
+      exportOptions: {
+        includePieces: $("#includePieces").checked,
+        includeMaster: $("#includeMaster").checked,
+        includeFullArtPdf: $("#includeFullArtPdf").checked,
+        includeWithCardPdf: $("#includeWithCardPdf").checked,
+        includeCard: includeCardRequested(),
+      },
+      documentRef: document,
+      signal: exportController.signal,
+      onProgress: setExportProgress,
+    });
+    if (state.packageUrl) URL.revokeObjectURL(state.packageUrl);
+    const packageBlob = new Blob([result.bytes], { type: "application/zip" });
+    state.packageUrl = URL.createObjectURL(packageBlob);
+    $("#resultName").textContent = result.filename;
+    $("#resultNotes").textContent = `${result.entries.length} files · ${Math.round(result.bytes.byteLength / 1024)} KB · ${result.qualityReport.overallStatus}`;
+    const download = $("#downloadButton");
+    download.href = state.packageUrl;
+    download.download = result.filename;
+    $("#resultPanel").hidden = false;
+    triggerDownload(packageBlob, result.filename);
+    showToast("Print package created and downloaded.");
+  } catch (error) {
+    if (error.name === "AbortError") showToast("Package export cancelled.");
+    else showToast(error.message || "The print package could not be created.");
+  } finally {
+    exportController = null;
+    state.exportBusy = false;
+    state.alignmentBusy = false;
+    setProgressVisible(false);
+    updateAutoAlignAvailability();
+    updateExportSummary();
+    $("#exportButton").focus();
+  }
 });
 
 function proofName() {
@@ -757,6 +831,7 @@ window.addEventListener("beforeunload", () => {
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     releaseImage(state[`${kind}Image`]);
   });
+  if (state.packageUrl) URL.revokeObjectURL(state.packageUrl);
 });
 updateSetupSummary();
 updateStudioContract();

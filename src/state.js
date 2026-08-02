@@ -31,6 +31,8 @@ export function createInitialState(profiles, papers) {
     matcherDiagnostics: null,
     qualityReport: null,
     alignmentRequestId: 0,
+    exportBusy: false,
+    packageUrl: null,
     focusBeforeAlignment: null,
     setupStep: "product",
     quality: { warnings: [] },

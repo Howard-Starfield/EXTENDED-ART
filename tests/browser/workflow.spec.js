@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { Uint8ArrayReader, ZipReader } from "@zip.js/zip.js";
 import { readFileSync } from "node:fs";
 import { deflateSync } from "node:zlib";
 
@@ -147,4 +148,40 @@ test("auto-aligns after both required images decode", async ({ page }) => {
   expect(phys.readUInt32BE(0)).toBe(11811);
   expect(phys.readUInt32BE(4)).toBe(11811);
   expect(phys[8]).toBe(1);
+
+  const packageDownloadPromise = page.waitForEvent("download");
+  await page.locator("#exportButton").click();
+  const packageDownload = await packageDownloadPromise;
+  expect(packageDownload.suggestedFilename()).toContain("_standard_a4_print_package_");
+  const packagePath = await packageDownload.path();
+  const packageBytes = readFileSync(packagePath);
+  const zipReader = new ZipReader(new Uint8ArrayReader(packageBytes));
+  const packageEntries = await zipReader.getEntries();
+  expect(packageEntries.map((entry) => entry.filename)).toEqual([
+    "manifest.json",
+    "PRINT_INSTRUCTIONS.txt",
+    "quality_report.json",
+    "synthetic_3x3_scene_standard_a4_cut_ready.pdf",
+    "synthetic_3x3_scene_standard_a4_print_guide.pdf",
+  ]);
+  expect(packageEntries.some((entry) => entry.filename.includes("card.png"))).toBe(false);
+  expect(packageEntries.some((entry) => entry.filename.startsWith("pieces/"))).toBe(false);
+  await zipReader.close();
+  await expect(page.locator("#resultPanel")).toBeVisible();
+
+  for (const selector of ["#includePieces", "#includeMaster", "#includeFullArtPdf", "#includeWithCardPdf"]) {
+    await page.locator(selector).check();
+  }
+  const optionalDownloadPromise = page.waitForEvent("download");
+  await page.locator("#exportButton").click();
+  const optionalDownload = await optionalDownloadPromise;
+  const optionalPath = await optionalDownload.path();
+  const optionalReader = new ZipReader(new Uint8ArrayReader(readFileSync(optionalPath)));
+  const optionalEntries = await optionalReader.getEntries();
+  const optionalNames = optionalEntries.map((entry) => entry.filename);
+  expect(optionalNames.some((name) => name.endsWith("_master_300dpi.png"))).toBe(true);
+  expect(optionalNames.some((name) => name.endsWith("_full_art_reference.pdf"))).toBe(true);
+  expect(optionalNames.some((name) => name.endsWith("_with_card_reference.pdf"))).toBe(true);
+  expect(optionalNames.filter((name) => name.startsWith("pieces/")).length).toBe(8);
+  await optionalReader.close();
 });

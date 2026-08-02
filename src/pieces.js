@@ -175,6 +175,21 @@ export function renderPrintablePieces({ masterCanvas, profile, cornerRadiusMm, d
   }));
 }
 
+export function renderCutReadyPieces({ masterCanvas, profile, cornerRadiusMm, labelBox = profile.label_box, documentRef = globalThis.document, canvasFactory }) {
+  return getPrintablePieceGeometry(profile).map((piece) => ({
+    ...piece,
+    canvas: renderCutReadyPieceFromMaster({
+      masterCanvas,
+      piece,
+      profile,
+      cornerRadiusMm,
+      labelBox,
+      documentRef,
+      canvasFactory,
+    }),
+  }));
+}
+
 export function coverSourceSize(image) {
   return imageSize(image);
 }

@@ -1,12 +1,13 @@
 # ExtendedArt Web delivery roadmap
 
-Status: Phase 2 in progress
+Status: Phase 3 in progress; Phase 2 real-image audit remains pending
 
-Gate record (2026-08-02): `npm.cmd run test` passes 34 tests, `npm.cmd run
+Gate record (2026-08-02): `npm.cmd run test` passes 47 tests, `npm.cmd run
 build` passes, and `npm.cmd run test:browser` passes all 3 browser tests,
 including worker-backed matching, progress locking, fallback messaging,
 deterministic master/piece geometry, PSA/frame/binder masks, quality-report
-diagnostics, synthetic matcher release gates, correction, and proof-download
+diagnostics, synthetic matcher release gates, exact PDFs, deterministic ZIP
+assembly, default/optional package downloads, correction, and proof-download
 flows. The browser project has not been published or pushed.
 
 Repository checkpoints: commit 0755713 contains the Phase 1 browser-local
@@ -795,7 +796,7 @@ correction. A timeout is not a low-confidence result.
 
 ## Phase 3 - PDF, print-guide, and ZIP parity
 
-Status: Pending
+Status: In progress; P3-01 through P3-07 implemented; P3-08 release audit pending
 
 Goal: Produce the final customer ZIP entirely in the browser using the
 corrected physical-size, filename, optional-output, pagination, and guide
@@ -907,40 +908,40 @@ accurate cutting output.
 
 ### Ordered implementation checklist
 
-- [ ] P3-01 Replace shrink-to-fit with the exact page-layout matrix in shared
-      browser geometry and the Python fixture oracle; add Vault Letter
-      pagination and the 8x10 A4 margin warning.
-- [ ] P3-02 Implement the pdf-lib adapter with exact MediaBoxes, unscaled
+- [x] P3-01 Implement the exact page-layout matrix in shared browser geometry;
+      add Vault Letter pagination and the 8x10 A4 margin warning. Python-oracle
+      comparison remains part of the pending real-fixture audit.
+- [x] P3-02 Implement the pdf-lib adapter with exact MediaBoxes, unscaled
       placements, dashed outer guides, inset internal guides, and page metadata.
-- [ ] P3-03 Render cut-ready PDFs for every profile/paper combination and verify
+- [x] P3-03 Render cut-ready PDFs for every profile/paper combination and verify
       eight-piece binder output plus PSA/frame blank openings.
-- [ ] P3-04 Implement the optional with-card PDF, piece PNGs, master PNG, and
+- [x] P3-04 Implement the optional with-card PDF, piece PNGs, master PNG, and
       reference-only full-art PDF as independent opt-in artifacts.
-- [ ] P3-05 Generate one paper-specific print guide per selected paper with a
+- [x] P3-05 Generate one paper-specific print guide per selected paper with a
       measured 50 mm square and actual-size instructions.
-- [ ] P3-06 Generate PRINT_INSTRUCTIONS.txt, quality_report.json, and
+- [x] P3-06 Generate PRINT_INSTRUCTIONS.txt, quality_report.json, and
       manifest.json from one normalized package model with SHA-256 entries.
-- [ ] P3-07 Implement @zip.js/zip.js streaming assembly, deterministic entry
+- [x] P3-07 Implement @zip.js/zip.js streaming assembly, deterministic entry
       order, progress, cancellation, memory estimation, and resource cleanup.
 - [ ] P3-08 Complete PDF parsing, archive, viewer, browser-memory, and physical
       print tests before enabling Create print package.
 
 ### Quality and testing checklist
 
-- [ ] Parse generated PDFs and assert A4 and Letter page boxes.
-- [ ] Assert physical image placements and cutout boxes in points.
-- [ ] Assert every cut-ready placement has scale exactly 1.0.
-- [ ] Assert Vault Letter is two pages and 8x10 A4 remains exact size with a
+- [x] Parse generated PDFs and assert A4 and Letter page boxes.
+- [x] Assert physical image placements and cutout boxes in points.
+- [x] Assert every cut-ready placement has scale exactly 1.0.
+- [x] Assert Vault Letter is two pages and 8x10 A4 remains exact size with a
       printer-margin warning.
-- [ ] Assert no trim guide intersects an artwork rectangle.
-- [ ] Assert no internal chamber guide intersects retained artwork.
-- [ ] Assert default PSA output has blank label and card chambers.
-- [ ] Assert the original card is absent from default cut-ready files.
-- [ ] Assert the optional with-card reference PDF appears only when checked and
+- [x] Assert no trim guide intersects an artwork rectangle.
+- [x] Assert no internal chamber guide intersects retained artwork.
+- [x] Assert default PSA output has blank label and card chambers.
+- [x] Assert the original card is absent from default cut-ready files.
+- [x] Assert the optional with-card reference PDF appears only when checked and
       the raw original-card file never appears.
-- [ ] Assert default output has no pieces folder, master PNG, or full-art PDF.
-- [ ] Assert opt-in output includes exactly the requested optional files.
-- [ ] Assert archive entry order and manifest file list are deterministic.
+- [x] Assert default output has no pieces folder, master PNG, or full-art PDF.
+- [x] Assert opt-in output includes exactly the requested optional files.
+- [x] Assert archive entry order and manifest file list are deterministic.
 - [ ] Compare browser page reports with Python reference reports.
 - [ ] Open generated PDFs in at least two desktop PDF viewers.
 - [ ] Print one A4 sheet and one Letter sheet and measure the calibration square.
