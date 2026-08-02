@@ -1,0 +1,23 @@
+{
+  "name": "extendedart-web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:browser": "playwright test"
+  },
+  "dependencies": {
+    "@zip.js/zip.js": "2.8.34",
+    "pdf-lib": "1.17.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.62.1",
+    "vite": "8.2.0",
+    "vitest": "4.1.10"
+  }
+}

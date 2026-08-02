@@ -1,140 +1,52 @@
-"use strict";
+import {
+  cleanMeasure,
+  cardPhysicalMm,
+  fallbackPapers,
+  fallbackProfiles,
+  paperFit,
+  pixelPair,
+  profileSummary,
+  psaLabelBox as makePsaLabelBox,
+} from "./src/profiles.js";
+import { createInitialState, imageSize, releaseImage } from "./src/state.js";
+import { fileSummary, readImage } from "./src/image-io.js";
+import { classifyEffectiveDpi } from "./src/quality.js";
+import { CENTER_FIT_ALIGNMENT, createAlignmentJobRunner } from "./src/alignment.js";
+import { drawAlignmentScene, drawArtworkProof } from "./src/renderer.js";
+import { triggerDownload, withPrintMetadata } from "./src/png.js";
 
 const $ = (selector) => document.querySelector(selector);
-
-const fallbackProfiles = {
-  standard: {
-    name: "standard", label: "Standard 3×3 Binder", grid: [3, 3], piece_count: 9,
-    insert_mm: [63, 88], insert_px: [744, 1039], master_mm: [189, 264],
-    master_px: [2232, 3118], card_box: [1/3, 1/3, 2/3, 2/3],
-    label_box: null,
-    recommended_corner_radius_mm: 3,
-  },
-  vaultx: {
-    name: "vaultx", label: "Vault Binder", grid: [3, 3], piece_count: 9,
-    insert_mm: [66, 94], insert_px: [780, 1110], master_mm: [198, 282],
-    master_px: [2339, 3331], card_box: [1/3, 1/3, 2/3, 2/3],
-    label_box: null,
-    recommended_corner_radius_mm: 3,
-  },
-  psa: {
-    name: "psa", label: "PSA Slab", grid: [1, 1], piece_count: 1,
-    insert_mm: [80.264, 135.128], insert_px: [948, 1596], master_mm: [80.264, 135.128],
-    master_px: [948, 1596],
-    card_box: [8.632/80.264, 36/135.128, 71.632/80.264, 124/135.128],
-    label_box: [5.207/80.264, 5/135.128, 75.057/80.264, 26.59/135.128],
-    label_box_mm: [5.207, 5, 69.85, 21.59],
-    recommended_corner_radius_mm: 3,
-  },
-  photo8x10: {
-    name: "photo8x10", label: "8x10 Photo Frame", grid: [1, 1], piece_count: 1,
-    insert_mm: [203.2, 254], insert_px: [2400, 3000], master_mm: [203.2, 254],
-    master_px: [2400, 3000], card_box: [0.345, 0.3268, 0.655, 0.6732],
-    label_box: null,
-    recommended_corner_radius_mm: 0,
-  },
-};
-
-const fallbackPapers = {
-  a4: { name: "a4", label: "A4", size_mm: [210, 297] },
-  letter: { name: "letter", label: "US Letter", size_mm: [215.9, 279.4] },
-};
-
 const canvas = $("#alignmentCanvas");
 const shell = $("#canvasShell");
-const ctx = canvas.getContext("2d", { alpha: false });
-const state = {
-  profile: "standard",
-  paper: "a4",
-  profiles: fallbackProfiles,
-  papers: fallbackPapers,
-  artFile: null,
-  cardFile: null,
-  artImage: null,
-  cardImage: null,
-  artPreviewUrl: null,
-  cardPreviewUrl: null,
-  zoom: 1,
-  offsetX: 0,
-  offsetY: 0,
-  opacity: 0.72,
-  cornerRadiusMm: 3,
-  psaLabelWidthMm: 69.85,
-  psaLabelHeightMm: 21.59,
-  showGrid: true,
-  showCard: true,
-  difference: false,
-  dragging: false,
-  pointerX: 0,
-  pointerY: 0,
-};
-
-function activeProfile() { return state.profiles[state.profile] || fallbackProfiles.standard; }
-function activePaper() { return state.papers[state.paper] || fallbackPapers.a4; }
-function cleanMeasure(value) { return Number.isInteger(value) ? String(value) : Number(value).toFixed(1).replace(/\.0$/, ""); }
-function pixelPair(values) { return values[0] + " × " + values[1]; }
-
-function psaLabelBox(profile) {
-  const widthMm = state.psaLabelWidthMm;
-  const heightMm = state.psaLabelHeightMm;
-  const leftMm = (profile.master_mm[0] - widthMm) / 2;
-  const topMm = 5;
-  return [
-    leftMm / profile.master_mm[0],
-    topMm / profile.master_mm[1],
-    (leftMm + widthMm) / profile.master_mm[0],
-    (topMm + heightMm) / profile.master_mm[1],
-  ];
-}
-
-function paperFit(profile, paperName) {
-  if (profile.paper_fit?.[paperName]) return profile.paper_fit[paperName];
-  const paper = state.papers[paperName] || fallbackPapers[paperName];
-  const gapMm = 2;
-  const safeMarginMm = 4;
-  const contentWidth = profile.insert_mm[0] * profile.grid[0] + gapMm * (profile.grid[0] - 1);
-  const contentHeight = profile.insert_mm[1] * profile.grid[1] + gapMm * (profile.grid[1] - 1);
-  const scale = Math.min(
-    1,
-    (paper.size_mm[0] - safeMarginMm * 2) / contentWidth,
-    (paper.size_mm[1] - safeMarginMm * 2) / contentHeight,
-  );
-  return { page_mm: paper.size_mm, scale };
-}
-
-function updatePaperTools() {
-  const profile = activeProfile();
-  [
-    ["a4", "#a4PaperTool", "#a4Fit"],
-    ["letter", "#letterPaperTool", "#letterFit"],
-  ].forEach(([paperName, buttonSelector, fitSelector]) => {
-    const paper = state.papers[paperName] || fallbackPapers[paperName];
-    const fit = paperFit(profile, paperName);
-    const selected = state.paper === paperName;
-    const percent = fit.scale < 0.9995 ? (fit.scale * 100).toFixed(1) + "%" : "100%";
-    const dimensions = paper.size_mm.map(cleanMeasure).join("×");
-    const button = $(buttonSelector);
-    button.classList.toggle("active", selected);
-    button.classList.toggle("scaled", fit.scale < 0.9995);
-    button.setAttribute("aria-pressed", String(selected));
-    button.setAttribute(
-      "aria-label",
-      paper.label + " " + dimensions + " millimetres, output at " + percent,
-    );
-    button.title = paper.label + ": " + dimensions + " mm | output " + percent;
-    $(fitSelector).textContent = dimensions + " · " + percent;
-  });
-}
+const ctx = canvas.getContext("2d", { alpha: false, colorSpace: "srgb" });
+const state = createInitialState(fallbackProfiles, fallbackPapers);
 
 let toastTimer;
 let renderQueued = false;
+const intakeGeneration = { art: 0, card: 0 };
+
+function activeProfile() {
+  return state.profiles[state.profile] || fallbackProfiles.standard;
+}
+
+function activePaper() {
+  return state.papers[state.paper] || fallbackPapers.a4;
+}
+
+function currentPsaLabelBox() {
+  return makePsaLabelBox(activeProfile(), state.psaLabelWidthMm, state.psaLabelHeightMm);
+}
+
+function includeCardRequested() {
+  return $("#includeCard").checked;
+}
 
 function showToast(message) {
   const toast = $("#toast");
   toast.textContent = message;
   toast.classList.add("show");
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => toast.classList.remove("show"), 2600);
+  toastTimer = window.setTimeout(() => toast.classList.remove("show"), 2800);
 }
 
 function setRuler(element, total, divisions, suffix) {
@@ -142,7 +54,7 @@ function setRuler(element, total, divisions, suffix) {
   const count = divisions > 1 ? divisions : 1;
   for (let index = 0; index <= count; index += 1) {
     const value = total * index / count;
-    values.push("<span>" + cleanMeasure(value) + (index === count ? suffix : "") + "</span>");
+    values.push(`<span>${cleanMeasure(value)}${index === count ? suffix : ""}</span>`);
   }
   element.innerHTML = values.join("");
 }
@@ -154,71 +66,118 @@ function updateSetupSummary() {
   const paper = state.papers[paperName] || fallbackPapers[paperName];
   if (!(profile && paper)) return;
   $("#setupSummaryName").textContent = profile.label;
-  $("#setupSummaryPixels").textContent = pixelPair(profile.master_px) + " px";
-  $("#setupSummarySize").textContent = cleanMeasure(profile.master_mm[0]) + " × "
-    + cleanMeasure(profile.master_mm[1]) + " mm";
-  const unit = profile.piece_count === 1 ? (profile.name === "photo8x10" ? "print" : "insert") : "inserts";
-  $("#setupSummaryPackage").textContent = profile.piece_count + " " + unit + " + " + paper.label + " PDF";
+  $("#setupSummaryPixels").textContent = `${pixelPair(profile.master_px)} px`;
+  $("#setupSummarySize").textContent = `${cleanMeasure(profile.master_mm[0])} × ${cleanMeasure(profile.master_mm[1])} mm`;
+  $("#setupSummaryPackage").textContent = profileSummary(profile, paper);
 }
 
 function updateExportSummary() {
-  $("#exportButtonCopy").textContent = "PDF + ZIP parity is the next milestone";
+  const selected = [
+    $("#includePieces").checked ? "piece PNGs" : "",
+    $("#includeMaster").checked ? "master PNG" : "",
+    $("#includeFullArtPdf").checked ? "full-art PDF" : "",
+    $("#includeWithCardPdf").checked ? "with-card PDF" : "",
+  ].filter(Boolean);
+  $("#exportButtonCopy").textContent = selected.length
+    ? `${selected.join(", ")} · final PDF + ZIP engine next`
+    : "Final PDF + ZIP engine is the next milestone";
 }
 
+function updatePaperTools() {
+  const profile = activeProfile();
+  [
+    ["a4", "#a4PaperTool", "#a4Fit"],
+    ["letter", "#letterPaperTool", "#letterFit"],
+  ].forEach(([paperName, buttonSelector, fitSelector]) => {
+    const paper = state.papers[paperName] || fallbackPapers[paperName];
+    const fit = paperFit(profile, paperName, state.papers);
+    const selected = state.paper === paperName;
+    const percent = fit.scale < 0.9995 ? `${(fit.scale * 100).toFixed(1)}%` : "100%";
+    const dimensions = paper.size_mm.map(cleanMeasure).join("×");
+    const button = $(buttonSelector);
+    button.classList.toggle("active", selected);
+    button.classList.toggle("scaled", fit.scale < 0.9995);
+    button.setAttribute("aria-pressed", String(selected));
+    button.setAttribute("aria-label", `${paper.label} ${dimensions} millimetres, output at ${percent}`);
+    button.title = `${paper.label}: ${dimensions} mm | output ${percent}`;
+    $(fitSelector).textContent = `${dimensions} · ${percent}`;
+  });
+}
 
+function updateSetupWizard() {
+  const productStep = state.setupStep === "product";
+  $("#setupProductStep").hidden = !productStep;
+  $("#setupPaperStep").hidden = productStep;
+  $("#setupStepLabel").textContent = productStep ? "Step 1 of 2" : "Step 2 of 2";
+  $("#launchTitle").textContent = productStep ? "What are we making today?" : "Choose your paper size";
+  const description = $("#launchTitle").parentElement.querySelector("p:last-child");
+  description.textContent = productStep
+    ? "Choose the physical object first. Every crop, guide and export will follow it."
+    : "Pick the first sheet for this package. You can add the other paper size during final export.";
+  const selectedProduct = document.querySelector('input[name="profile"]:checked');
+  const selectedPaper = document.querySelector('input[name="paper"]:checked');
+  $("#continueSetupButton").disabled = !selectedProduct;
+  $("#startStudioButton").disabled = !selectedPaper;
+}
 
 function updateStudioContract() {
   const profile = activeProfile();
   const paper = activePaper();
-  const isBinder = profile.piece_count > 1;
-  shell.style.aspectRatio = profile.master_px[0] + " / " + profile.master_px[1];
+  const isBinder = profile.grid[0] > 1;
+  shell.style.aspectRatio = `${profile.master_px[0]} / ${profile.master_px[1]}`;
   shell.classList.toggle("photo-frame-mode", profile.name === "photo8x10");
   $("#frameModeBadge").hidden = profile.name !== "photo8x10";
   $(".light-table").dataset.paper = state.paper;
-  $("#activeSpec").textContent = profile.label + " | " + pixelPair(profile.master_px)
-    + " px | " + paper.label + " | 300 DPI";
+  $("#activeSpec").textContent = `${profile.label} | ${pixelPair(profile.master_px)} px | ${paper.label} | 300 DPI`;
   $("#artDropTitle").textContent = isBinder
-    ? "Extended " + profile.grid[0] + "×" + profile.grid[1] + " artwork"
-    : "Extended " + profile.label + " artwork";
+    ? `Extended ${profile.grid[0]}×${profile.grid[1]} artwork`
+    : `Extended ${profile.label} artwork`;
   $("#artDropCopy").textContent = isBinder
-    ? "Drop or choose the continuous Image 2 scene"
+    ? "Drop or choose the continuous extended scene"
     : "Drop or choose the full display artwork";
   $("#methodCopy").textContent = isBinder
-    ? "The center card stays fixed. Drag the extended artwork underneath it until colors, shapes and perspective meet at the card edges."
-    : "The card zone stays fixed inside the display. Drag the artwork underneath it until the generated scene meets the card edges.";
+    ? "The original card is required for the automatic baseline. Drag the extended artwork underneath the fixed center reference until the edges meet."
+    : "The original card is required for the automatic baseline. The card zone stays fixed while you refine the display scene underneath it.";
   $("#emptyStateCopy").textContent = isBinder
-    ? "Drop the full " + profile.grid[0] + "x" + profile.grid[1] + " image on the left to begin."
-    : "Drop the full " + profile.label + " image on the left to begin.";
+    ? `Drop the full ${profile.grid[0]}x${profile.grid[1]} image on the left to begin.`
+    : `Drop the full ${profile.label} image on the left to begin.`;
   setRuler($("#rulerX"), profile.master_mm[0], profile.grid[0], " mm");
   setRuler($("#rulerY"), profile.master_mm[1], profile.grid[1], "");
   $("#masterContract").textContent = pixelPair(profile.master_px);
   $("#pieceContractLabel").textContent = profile.piece_count === 1 ? "Output" : "Insert";
   $("#pieceContract").textContent = pixelPair(profile.insert_px);
-  $("#paperContract").textContent = paper.label + " / 300 DPI";
-  $("#includeCardHelp").textContent = isBinder
-    ? "Turn off when the real card will go in the binder."
-    : profile.name === "psa"
-      ? "Turn off when the physical slab will cover this card zone."
-      : "Turn off when mounting the real card over the finished print.";
+  $("#paperContract").textContent = `${paper.label} / 300 DPI`;
+  $("#includeCardHelp").textContent = "Off by default to save ink; the cut-ready package leaves the center/card chamber empty.";
   $("#cutReadyOutputHelp").textContent = profile.name === "psa"
     ? "White PSA label + card chambers with dotted guides"
-    : "Finished inserts with cut guides";
+    : "Finished outer pieces with cut guides";
   $("#psaLabelControls").hidden = profile.name !== "psa";
   updatePaperTools();
   updateExportSummary();
+  updateQualityNotice();
   requestRender();
 }
 
+function focusVisibleSetupControl() {
+  const control = state.setupStep === "product"
+    ? document.querySelector('input[name="profile"]:checked')
+    : document.querySelector('input[name="paper"]:checked');
+  window.setTimeout(() => control?.focus(), 0);
+}
+
 function openSetup() {
+  state.setupStep = "product";
   const gate = $("#launchGate");
-  document.querySelector('input[name="profile"][value="' + state.profile + '"]').checked = true;
-  document.querySelector('input[name="paper"][value="' + state.paper + '"]').checked = true;
+  document.querySelectorAll('input[name="profile"], input[name="paper"]').forEach((input) => {
+    input.checked = input.name === "profile" ? input.value === state.profile : input.value === state.paper;
+  });
   updateSetupSummary();
+  updateSetupWizard();
   gate.hidden = false;
   document.body.classList.add("setup-open");
   $(".topbar").inert = true;
   $(".studio-shell").inert = true;
-  setTimeout(() => document.querySelector('input[name="profile"]:checked').focus(), 0);
+  focusVisibleSetupControl();
 }
 
 function closeSetup() {
@@ -230,34 +189,52 @@ function closeSetup() {
 
 function applySetup(event) {
   event.preventDefault();
+  if (state.setupStep !== "paper") return;
   const nextProfile = document.querySelector('input[name="profile"]:checked').value;
   const nextPaper = document.querySelector('input[name="paper"]:checked').value;
   const profileChanged = state.profile !== nextProfile;
   state.profile = nextProfile;
   state.paper = nextPaper;
+  $("#includeCard").checked = false;
   if (profileChanged) {
-    $("#includeCard").checked = nextProfile !== "psa";
     state.cornerRadiusMm = Number(activeProfile().recommended_corner_radius_mm || 0);
     $("#radiusRange").value = String(state.cornerRadiusMm);
-    $("#radiusValue").textContent = cleanMeasure(state.cornerRadiusMm) + " mm";
+    $("#radiusValue").textContent = `${cleanMeasure(state.cornerRadiusMm)} mm`;
     resetAlignment(false);
     $("#autoAlignStatus").hidden = true;
   }
   updateStudioContract();
   closeSetup();
   $("#changeSetupButton").focus();
+  if (state.artImage && state.cardImage) startAlignment("setup changed");
 }
 
 document.querySelectorAll('input[name="profile"], input[name="paper"]').forEach((input) => {
-  input.addEventListener("change", updateSetupSummary);
+  input.addEventListener("change", () => {
+    updateSetupSummary();
+    updateSetupWizard();
+  });
+});
+$("#continueSetupButton").addEventListener("click", () => {
+  state.setupStep = "paper";
+  updateSetupSummary();
+  updateSetupWizard();
+  focusVisibleSetupControl();
+});
+$("#backSetupButton").addEventListener("click", () => {
+  state.setupStep = "product";
+  updateSetupWizard();
+  focusVisibleSetupControl();
 });
 $("#setupForm").addEventListener("submit", applySetup);
 $("#changeSetupButton").addEventListener("click", openSetup);
 $("#launchGate").addEventListener("keydown", (event) => {
   if (event.key !== "Tab") return;
-  const focusable = [...$("#launchGate").querySelectorAll("input, button")].filter((item) => !item.disabled);
+  const focusable = [...$("#launchGate").querySelectorAll("input, button")]
+    .filter((item) => !item.disabled && !item.closest("[hidden]"));
   const first = focusable[0];
   const last = focusable[focusable.length - 1];
+  if (!first || !last) return;
   if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
   if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
 });
@@ -265,211 +242,191 @@ $("#launchGate").addEventListener("keydown", (event) => {
 function requestRender() {
   if (renderQueued) return;
   renderQueued = true;
-  requestAnimationFrame(render);
+  window.requestAnimationFrame(render);
 }
 
-function readImage(file) {
-  return new Promise((resolve, reject) => {
-    if (!file || !file.type.startsWith("image/")) {
-      reject(new Error("Choose a PNG, JPG, or WebP image."));
-      return;
-    }
-    const url = URL.createObjectURL(file);
-    const image = new Image();
-    image.onload = () => { URL.revokeObjectURL(url); resolve(image); };
-    image.onerror = () => {
-      URL.revokeObjectURL(url);
-      reject(new Error("This image could not be opened."));
-    };
-    image.src = url;
-  });
-}
-
-function fileSummary(file, image) {
-  const megabytes = (file.size / 1024 / 1024).toFixed(1);
-  return `${image.naturalWidth} x ${image.naturalHeight} px | ${megabytes} MB`;
-}
-
-function setPreview(kind, file) {
-  const key = kind + "PreviewUrl";
-  if (state[key]) URL.revokeObjectURL(state[key]);
-  state[key] = URL.createObjectURL(file);
-  const preview = $("#" + kind + "Preview");
-  preview.src = state[key];
-  preview.hidden = false;
+function updateQualityNotice() {
+  const messages = [
+    ...(state.artQuality?.warnings || []),
+    ...(state.cardQuality?.warnings || []),
+  ];
+  const profile = activeProfile();
+  if (state.artDimensions) {
+    messages.push(classifyEffectiveDpi("Extended artwork", state.artDimensions, profile.master_mm[0]).message);
+  }
+  if (state.cardDimensions) {
+    const cardMm = cardPhysicalMm(profile);
+    messages.push(classifyEffectiveDpi("Original card", state.cardDimensions, cardMm[0]).message);
+  }
+  const notice = $("#qualityNotice");
+  const uniqueMessages = [...new Set(messages)];
+  if (!uniqueMessages.length) {
+    notice.hidden = true;
+    notice.textContent = "";
+    return;
+  }
+  notice.textContent = uniqueMessages.join(" ");
+  notice.hidden = false;
 }
 
 function updateAutoAlignAvailability() {
   const button = $("#autoAlignButton");
-  button.disabled = button.classList.contains("is-loading") || !(state.artFile && state.cardFile);
+  button.disabled = state.alignmentBusy || !(state.artFile && state.cardFile) || Boolean(state.cardQuality?.blocksAlignment);
 }
 
-function applySuggestedAlignment(alignment) {
-  state.zoom = Math.min(2.5, Math.max(1, Number(alignment.zoom)));
-  state.offsetX = Math.min(1, Math.max(-1, Number(alignment.offset_x)));
-  state.offsetY = Math.min(1, Math.max(-1, Number(alignment.offset_y)));
-  const percent = Math.round(state.zoom * 100);
-  $("#zoomRange").value = String(percent);
-  $("#zoomValue").textContent = percent + "%";
-  state.showCard = true;
-  $("#cardToggle").classList.add("active");
-  $("#cardToggle").setAttribute("aria-pressed", "true");
-  requestRender();
-}
-
-
-function roundedRectPath(context, x, y, width, height, radius) {
-  const r = Math.max(0, Math.min(radius, width / 2, height / 2));
-  context.beginPath();
-  context.moveTo(x + r, y);
-  context.arcTo(x + width, y, x + width, y + height, r);
-  context.arcTo(x + width, y + height, x, y + height, r);
-  context.arcTo(x, y + height, x, y, r);
-  context.arcTo(x, y, x + width, y, r);
-  context.closePath();
-}
-
-function render() {
-  renderQueued = false;
-  const profile = activeProfile();
-  const rect = shell.getBoundingClientRect();
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
-  canvas.width = Math.max(1, Math.round(rect.width * dpr));
-  canvas.height = Math.max(1, Math.round(rect.height * dpr));
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  const width = rect.width;
-  const height = rect.height;
-  ctx.fillStyle = "#d9dad4";
-  ctx.fillRect(0, 0, width, height);
-  if (state.artImage) {
-    const base = Math.max(width / state.artImage.naturalWidth, height / state.artImage.naturalHeight);
-    const scale = base * state.zoom;
-    const drawWidth = state.artImage.naturalWidth * scale;
-    const drawHeight = state.artImage.naturalHeight * scale;
-    let left = (width - drawWidth) / 2 + state.offsetX * width;
-    let top = (height - drawHeight) / 2 + state.offsetY * height;
-    left = Math.min(0, Math.max(width - drawWidth, left));
-    top = Math.min(0, Math.max(height - drawHeight, top));
-    state.offsetX = (left - (width - drawWidth) / 2) / width;
-    state.offsetY = (top - (height - drawHeight) / 2) / height;
-    ctx.drawImage(state.artImage, left, top, drawWidth, drawHeight);
-  }
-  const columns = profile.grid[0];
-  const rows = profile.grid[1];
-  const cellW = width / columns;
-  const cellH = height / rows;
-  const pieceRadius = (state.cornerRadiusMm / profile.insert_mm[0]) * cellW;
-  const cardX = profile.card_box[0] * width;
-  const cardY = profile.card_box[1] * height;
-  const cardWBox = (profile.card_box[2] - profile.card_box[0]) * width;
-  const cardHBox = (profile.card_box[3] - profile.card_box[1]) * height;
-  const cardWidthMm = profile.master_mm[0] * (profile.card_box[2] - profile.card_box[0]);
-  const cardRadius = (state.cornerRadiusMm / cardWidthMm) * cardWBox;
-  if (state.cardImage && state.showCard) {
-    const cardScale = Math.max(
-      cardWBox / state.cardImage.naturalWidth,
-      cardHBox / state.cardImage.naturalHeight
-    );
-    const cardW = state.cardImage.naturalWidth * cardScale;
-    const cardH = state.cardImage.naturalHeight * cardScale;
-    ctx.save();
-    roundedRectPath(ctx, cardX, cardY, cardWBox, cardHBox, cardRadius);
-    ctx.clip();
-    ctx.globalAlpha = state.opacity;
-    if (state.difference) ctx.globalCompositeOperation = "difference";
-    ctx.drawImage(state.cardImage, cardX + (cardWBox-cardW)/2, cardY + (cardHBox-cardH)/2, cardW, cardH);
-    ctx.restore();
-  }
-  if (state.artImage && profile.name === "psa") {
-    const cutouts = [];
-    if (profile.label_box) cutouts.push(["PSA LABEL CUTOUT", psaLabelBox(profile), 2]);
-    if (!$("#includeCard").checked) cutouts.push(["CARD CUTOUT", profile.card_box, cardRadius]);
-    ctx.save();
-    for (const [label, box, radius] of cutouts) {
-      const cutX = box[0] * width;
-      const cutY = box[1] * height;
-      const cutW = (box[2] - box[0]) * width;
-      const cutH = (box[3] - box[1]) * height;
-      roundedRectPath(ctx, cutX, cutY, cutW, cutH, radius);
-      const referenceVisible = label === "CARD CUTOUT" && state.cardImage && state.showCard;
-      ctx.fillStyle = referenceVisible ? "rgba(255,255,255,.78)" : "rgba(255,255,255,.96)";
-      ctx.fill();
-      ctx.setLineDash([4, 3]);
-      ctx.strokeStyle = label === "PSA LABEL CUTOUT" ? "#f26345" : "#177884";
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
-      ctx.setLineDash([]);
-      ctx.fillStyle = "#4f595c";
-      ctx.font = '700 8px "Cascadia Mono", monospace';
-      ctx.textAlign = "center";
-      ctx.fillText(label, cutX + cutW / 2, cutY + Math.min(cutH / 2 + 3, 12));
-    }
-    ctx.restore();
-  }
-  if (state.showGrid) {
-    ctx.save();
-    ctx.strokeStyle = "rgba(255,255,255,.88)";
-    ctx.lineWidth = 1;
-    for (let row = 0; row < rows; row += 1) {
-      for (let col = 0; col < columns; col += 1) {
-        roundedRectPath(
-          ctx,
-          col * cellW + 0.5,
-          row * cellH + 0.5,
-          cellW - 1,
-          cellH - 1,
-          pieceRadius
-        );
-        ctx.stroke();
-      }
-    }
-    ctx.strokeStyle = state.difference ? "#f4d34d" : "#2aa9b8";
-    ctx.lineWidth = 2;
-    roundedRectPath(ctx, cardX + 1, cardY + 1, cardWBox - 2, cardHBox - 2, cardRadius);
-    ctx.stroke();
-    ctx.restore();
-  }
-  const xPixels = Math.round(state.offsetX * profile.master_px[0]);
-  const yPixels = Math.round(state.offsetY * profile.master_px[1]);
-  $("#offsetValue").textContent = "X " + xPixels + " / Y " + yPixels;
-}
-
-function resetAlignment(announce = true) {
-  state.zoom = 1;
-  state.offsetX = 0;
-  state.offsetY = 0;
+function applyCenterFit() {
+  state.baseline = { ...CENTER_FIT_ALIGNMENT };
+  state.zoom = state.baseline.zoom;
+  state.offsetX = state.baseline.offsetX;
+  state.offsetY = state.baseline.offsetY;
   $("#zoomRange").value = "100";
   $("#zoomValue").textContent = "100%";
-  requestRender();
-  if (announce) showToast("Artwork fit to the full page.");
+}
+
+function setProgressVisible(visible) {
+  $("#alignmentProgress").hidden = !visible;
+  document.body.classList.toggle("alignment-busy", visible);
+  $(".studio-shell").inert = visible;
+  $(".topbar").inert = visible;
+  $(".studio-shell").setAttribute("aria-busy", String(visible));
+  $(".alignment-progress").setAttribute("aria-busy", String(visible));
+  if (visible) window.setTimeout(() => $("#cancelAlignmentButton").focus(), 0);
+}
+
+function showAlignmentProgress({ jobId, label, progress }) {
+  $("#progressJob").textContent = `JOB ${String(jobId).padStart(4, "0")}`;
+  $("#progressTitle").textContent = progress >= 100 ? "Alignment baseline ready" : "Aligning locally";
+  $("#progressMessage").textContent = "The controls are locked while the original card and scene are prepared.";
+  $("#progressStage").textContent = label;
+  $("#progressPercent").textContent = `${progress}%`;
+  $("#progressBar").style.width = `${progress}%`;
+}
+
+function finishAlignmentCancel(message = "Alignment cancelled. Upload both images or run it again when ready.") {
+  if (!state.alignmentBusy) return;
+  state.alignmentBusy = false;
+  state.alignmentStatus = "CANCELLED";
+  $("#autoAlignButton").classList.remove("is-loading");
+  setProgressVisible(false);
+  updateAutoAlignAvailability();
+  $("#autoAlignStatus").textContent = message;
+  $("#autoAlignStatus").classList.add("low");
+  $("#autoAlignStatus").hidden = false;
+  window.setTimeout(() => $("#autoAlignButton").focus(), 0);
+}
+
+const alignmentRunner = createAlignmentJobRunner({
+  onProgress: (event) => {
+    if (event.jobId !== state.alignmentJobId) return;
+    showAlignmentProgress(event);
+  },
+  onComplete: (result) => {
+    if (result.jobId !== state.alignmentJobId) return;
+    state.alignmentBusy = false;
+    state.lastCompletedJobId = result.jobId;
+    state.alignmentStatus = result.status;
+    $("#autoAlignStatus").dataset.alignmentStatus = result.status;
+    $("#autoAlignButton").classList.remove("is-loading");
+    applyCenterFit();
+    setProgressVisible(false);
+    $("#autoAlignStatus").textContent = "Centered only - reference matching is not complete; inspect the card edges and fine-tune.";
+    $("#autoAlignStatus").classList.remove("low");
+    $("#autoAlignStatus").hidden = false;
+    $("#proofButton").disabled = false;
+    updateAutoAlignAvailability();
+    requestRender();
+    window.setTimeout(() => $("#proofButton").focus(), 0);
+    showToast("Automatic local baseline applied.");
+  },
+  onCancel: () => finishAlignmentCancel(),
+  onError: (error, jobId) => {
+    if (jobId !== state.alignmentJobId) return;
+    state.alignmentBusy = false;
+    state.alignmentStatus = "ERROR";
+    $("#autoAlignButton").classList.remove("is-loading");
+    setProgressVisible(false);
+    updateAutoAlignAvailability();
+    $("#autoAlignStatus").textContent = `Alignment failed: ${error.message || "try again when both images are ready."}`;
+    $("#autoAlignStatus").classList.add("low");
+    $("#autoAlignStatus").hidden = false;
+    showToast(error.message || "Alignment could not be completed.");
+  },
+});
+
+$("#alignmentProgress").addEventListener("keydown", (event) => {
+  if (event.key !== "Tab") return;
+  event.preventDefault();
+  $("#cancelAlignmentButton").focus();
+});
+
+function startAlignment(reason = "both images ready") {
+  if (!(state.artFile && state.cardFile) || state.cardQuality?.blocksAlignment) return;
+  if (state.alignmentBusy) alignmentRunner.cancel();
+  state.alignmentBusy = true;
+  state.alignmentStatus = "RUNNING";
+  $("#autoAlignStatus").hidden = true;
+  $("#autoAlignButton").classList.add("is-loading");
+  updateAutoAlignAvailability();
+  const jobId = alignmentRunner.start();
+  state.alignmentJobId = jobId;
+  showAlignmentProgress({ jobId, label: `Starting ${reason}`, progress: 0 });
+  setProgressVisible(true);
+}
+
+$("#cancelAlignmentButton").addEventListener("click", () => {
+  alignmentRunner.cancel();
+  $("#autoAlignButton").classList.remove("is-loading");
+});
+$("#autoAlignButton").addEventListener("click", () => startAlignment("manual retry"));
+
+function setPreview(kind, file) {
+  const key = `${kind}PreviewUrl`;
+  if (state[key]) URL.revokeObjectURL(state[key]);
+  state[key] = URL.createObjectURL(file);
+  const preview = $(`#${kind}Preview`);
+  preview.src = state[key];
+  preview.hidden = false;
 }
 
 async function loadFile(kind, file) {
+  if (state.alignmentBusy) return;
+  const generation = ++intakeGeneration[kind];
   try {
-    const image = await readImage(file);
-    if (kind === "art") {
-      state.artFile = file;
-      state.artImage = image;
-      setPreview("art", file);
-      $("#artMeta").textContent = fileSummary(file, image);
-      $("#artDrop").classList.add("loaded");
-      $("#emptyState").hidden = true;
-      // The browser shell intentionally keeps export disabled until the PDF
-      // and ZIP parity layer is implemented.
-      $("#exportButton").disabled = true;
-      resetAlignment();
-    } else {
-      state.cardFile = file;
-      state.cardImage = image;
-      setPreview("card", file);
-      $("#cardMeta").textContent = fileSummary(file, image);
-      $("#cardDrop").classList.add("loaded");
-      requestRender();
+    const decoded = await readImage(file, kind);
+    if (generation !== intakeGeneration[kind]) {
+      releaseImage(decoded.image);
+      return;
     }
-    const status = $("#autoAlignStatus");
-    status.hidden = true;
-    status.classList.remove("low");
+    const oldImage = state[`${kind}Image`];
+    releaseImage(oldImage);
+    state[`${kind}File`] = file;
+    state[`${kind}Image`] = decoded.image;
+    state[`${kind}Quality`] = decoded;
+    state[`${kind}Dimensions`] = { width: decoded.width, height: decoded.height };
+    state.lastCompletedJobId = 0;
+    state.baseline = null;
+    setPreview(kind, file);
+    $(`#${kind}Meta`).textContent = fileSummary(file, decoded);
+    $(`#${kind}Drop`).classList.add("loaded");
+    if (kind === "art") {
+      $("#emptyState").hidden = true;
+      resetAlignment(false);
+    }
+    state.alignmentStatus = "NEEDS_REFERENCE";
+    $("#proofButton").disabled = true;
+    $("#autoAlignStatus").hidden = true;
+    updateQualityNotice();
     updateAutoAlignAvailability();
+    requestRender();
+    if (state.artImage && state.cardImage) {
+      if (state.cardQuality?.blocksAlignment) {
+        $("#autoAlignStatus").textContent = state.cardQuality.blockingIssues.join(" ");
+        $("#autoAlignStatus").classList.add("low");
+        $("#autoAlignStatus").hidden = false;
+      } else {
+        startAlignment("both images ready");
+      }
+    }
   } catch (error) {
     showToast(error.message);
   }
@@ -482,7 +439,7 @@ function bindDropZone(zoneSelector, inputSelector, kind) {
   ["dragenter", "dragover"].forEach((eventName) => {
     zone.addEventListener(eventName, (event) => {
       event.preventDefault();
-      zone.classList.add("dragging");
+      if (!state.alignmentBusy) zone.classList.add("dragging");
     });
   });
   ["dragleave", "drop"].forEach((eventName) => {
@@ -490,6 +447,7 @@ function bindDropZone(zoneSelector, inputSelector, kind) {
   });
   zone.addEventListener("drop", (event) => {
     event.preventDefault();
+    if (state.alignmentBusy) return;
     const file = event.dataTransfer.files[0];
     if (file) loadFile(kind, file);
   });
@@ -498,63 +456,52 @@ function bindDropZone(zoneSelector, inputSelector, kind) {
 bindDropZone("#artDrop", "#artInput", "art");
 bindDropZone("#cardDrop", "#cardInput", "card");
 
-function showAutoAlignResult(alignment) {
-  applySuggestedAlignment(alignment);
-  const guidance = alignment.quality === "high"
-    ? "Ready to inspect."
-    : alignment.quality === "medium"
-      ? "Check the card edges and nudge if needed."
-      : "The AI redraw differs; use this as a starting point.";
-  const status = $("#autoAlignStatus");
-  status.textContent = alignment.confidence + "% confidence | "
-    + alignment.matched_region + ". " + guidance;
-  status.classList.toggle("low", alignment.quality === "low");
-  status.hidden = false;
-  showToast("Suggested alignment applied.");
+function render() {
+  renderQueued = false;
+  const profile = activeProfile();
+  const rect = shell.getBoundingClientRect();
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  canvas.width = Math.max(1, Math.round(rect.width * dpr));
+  canvas.height = Math.max(1, Math.round(rect.height * dpr));
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const result = drawAlignmentScene({
+    context: ctx,
+    width: rect.width,
+    height: rect.height,
+    profile,
+    state,
+    artImage: state.artImage,
+    cardImage: state.cardImage,
+    includeCard: includeCardRequested(),
+    labelBox: profile.name === "psa" ? currentPsaLabelBox() : null,
+  });
+  state.offsetX = result.offsetX;
+  state.offsetY = result.offsetY;
+  const xPixels = Math.round(state.offsetX * profile.master_px[0]);
+  const yPixels = Math.round(state.offsetY * profile.master_px[1]);
+  $("#offsetValue").textContent = `X ${xPixels} / Y ${yPixels}`;
 }
 
-
-function autoAlignArtwork() {
-  if (!(state.artFile && state.cardFile)) return;
-  const button = $("#autoAlignButton");
-  const label = button.querySelector("strong");
-  button.classList.add("is-loading");
-  button.disabled = true;
-  label.textContent = "Centering scene...";
-  $("#autoAlignStatus").hidden = true;
-
-  // Phase 1 keeps the workflow browser-local and provides a deterministic
-  // center-fit starting point. The visual matcher will replace this baseline
-  // in the next parity milestone without changing the UI contract.
-  window.setTimeout(() => {
-    state.zoom = 1;
-    state.offsetX = 0;
-    state.offsetY = 0;
-    $("#zoomRange").value = "100";
-    $("#zoomValue").textContent = "100%";
-    $("#autoAlignStatus").textContent = "Centered locally. Inspect the card edges and fine-tune if needed.";
-    $("#autoAlignStatus").classList.remove("low");
-    $("#autoAlignStatus").hidden = false;
-    requestRender();
-    button.classList.remove("is-loading");
-    label.textContent = "Center-fit artwork";
-    updateAutoAlignAvailability();
-    showToast("Browser-local center fit applied.");
-  }, 180);
+function resetAlignment(announce = true) {
+  const baseline = state.baseline || CENTER_FIT_ALIGNMENT;
+  state.zoom = baseline.zoom;
+  state.offsetX = baseline.offsetX;
+  state.offsetY = baseline.offsetY;
+  $("#zoomRange").value = "100";
+  $("#zoomValue").textContent = "100%";
+  requestRender();
+  if (announce) showToast("Artwork fit to the full page.");
 }
-
-$("#autoAlignButton").addEventListener("click", autoAlignArtwork);
-
 
 shell.addEventListener("pointerdown", (event) => {
-  if (!state.artImage) return;
+  if (state.alignmentBusy || !state.artImage) return;
   state.dragging = true;
   state.pointerX = event.clientX;
   state.pointerY = event.clientY;
   shell.setPointerCapture(event.pointerId);
 });
 shell.addEventListener("pointermove", (event) => {
-  if (!state.dragging) return;
+  if (state.alignmentBusy || !state.dragging) return;
   const rect = shell.getBoundingClientRect();
   state.offsetX += (event.clientX - state.pointerX) / rect.width;
   state.offsetY += (event.clientY - state.pointerY) / rect.height;
@@ -566,17 +513,18 @@ shell.addEventListener("pointermove", (event) => {
   shell.addEventListener(eventName, () => { state.dragging = false; });
 });
 shell.addEventListener("wheel", (event) => {
-  if (!state.artImage) return;
+  if (state.alignmentBusy || !state.artImage) return;
   event.preventDefault();
   const direction = event.deltaY > 0 ? -0.03 : 0.03;
   state.zoom = Math.min(2.5, Math.max(1, state.zoom + direction));
   const percent = Math.round(state.zoom * 100);
   $("#zoomRange").value = String(percent);
-  $("#zoomValue").textContent = percent + "%";
+  $("#zoomValue").textContent = `${percent}%`;
   requestRender();
 }, { passive: false });
 
 function nudge(dx, dy, amount = 1) {
+  if (state.alignmentBusy) return;
   const profile = activeProfile();
   state.offsetX += (dx * amount) / profile.master_px[0];
   state.offsetY += (dy * amount) / profile.master_px[1];
@@ -584,15 +532,10 @@ function nudge(dx, dy, amount = 1) {
 }
 
 shell.addEventListener("keydown", (event) => {
-  const amount = event.shiftKey ? 10 : 1;
-  const moves = {
-    ArrowUp: [0, -1],
-    ArrowDown: [0, 1],
-    ArrowLeft: [-1, 0],
-    ArrowRight: [1, 0],
-  };
-  if (!moves[event.key]) return;
+  const moves = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0] };
+  if (state.alignmentBusy || !moves[event.key]) return;
   event.preventDefault();
+  const amount = event.shiftKey ? 10 : 1;
   nudge(moves[event.key][0], moves[event.key][1], amount);
 });
 document.querySelectorAll("[data-nudge]").forEach((button) => {
@@ -601,82 +544,115 @@ document.querySelectorAll("[data-nudge]").forEach((button) => {
     nudge(values[0], values[1], 4);
   });
 });
-$("#resetButton").addEventListener("click", resetAlignment);
+$("#resetButton").addEventListener("click", () => resetAlignment());
 
 $("#zoomRange").addEventListener("input", (event) => {
+  if (state.alignmentBusy) return;
   state.zoom = Number(event.target.value) / 100;
-  $("#zoomValue").textContent = event.target.value + "%";
+  $("#zoomValue").textContent = `${event.target.value}%`;
   requestRender();
 });
 $("#opacityRange").addEventListener("input", (event) => {
+  if (state.alignmentBusy) return;
   state.opacity = Number(event.target.value) / 100;
-  $("#opacityValue").textContent = event.target.value + "%";
+  $("#opacityValue").textContent = `${event.target.value}%`;
   requestRender();
 });
 $("#radiusRange").addEventListener("input", (event) => {
+  if (state.alignmentBusy) return;
   state.cornerRadiusMm = Number(event.target.value);
-  const label = Number.isInteger(state.cornerRadiusMm)
-    ? String(state.cornerRadiusMm)
-    : state.cornerRadiusMm.toFixed(1);
-  $("#radiusValue").textContent = label + " mm";
+  $("#radiusValue").textContent = `${cleanMeasure(state.cornerRadiusMm)} mm`;
   requestRender();
 });
 
 function updatePsaLabelDimensions() {
+  if (state.alignmentBusy) return;
   const widthInput = $("#psaLabelWidth");
   const heightInput = $("#psaLabelHeight");
   if (!(widthInput.checkValidity() && heightInput.checkValidity())) return;
   state.psaLabelWidthMm = Number(widthInput.value);
   state.psaLabelHeightMm = Number(heightInput.value);
+  $(".dimension-hint").textContent = `${(state.psaLabelWidthMm / 25.4).toFixed(2)} × ${(state.psaLabelHeightMm / 25.4).toFixed(2)} in · ${Math.round(state.psaLabelWidthMm / 25.4 * 300)} × ${Math.round(state.psaLabelHeightMm / 25.4 * 300)} px at 300 DPI`;
   requestRender();
 }
-
 $("#psaLabelWidth").addEventListener("input", updatePsaLabelDimensions);
 $("#psaLabelHeight").addEventListener("input", updatePsaLabelDimensions);
 
 function bindToggle(selector, stateKey) {
   $(selector).addEventListener("click", (event) => {
+    if (state.alignmentBusy) return;
     state[stateKey] = !state[stateKey];
     event.currentTarget.classList.toggle("active", state[stateKey]);
     event.currentTarget.setAttribute("aria-pressed", String(state[stateKey]));
     requestRender();
   });
 }
-
 bindToggle("#gridToggle", "showGrid");
 bindToggle("#cardToggle", "showCard");
 bindToggle("#differenceToggle", "difference");
 
 function choosePaper(paperName) {
-  if (!(paperName in state.papers)) return;
+  if (state.alignmentBusy || !(paperName in state.papers)) return;
   state.paper = paperName;
-  const setupChoice = document.querySelector('input[name="paper"][value="' + paperName + '"]');
+  const setupChoice = document.querySelector(`input[name="paper"][value="${paperName}"]`);
   if (setupChoice) setupChoice.checked = true;
   updateSetupSummary();
   updateStudioContract();
 }
-
 $("#a4PaperTool").addEventListener("click", () => choosePaper("a4"));
 $("#letterPaperTool").addEventListener("click", () => choosePaper("letter"));
-
 $("#includeCard").addEventListener("change", requestRender);
-$("#exitAppButton").addEventListener("click", () => {
-  window.location.reload();
-});
-["#includePieces", "#includeMaster", "#includeFullArtPdf"].forEach((selector) => {
+$("#exitAppButton").addEventListener("click", () => window.location.reload());
+["#includePieces", "#includeMaster", "#includeFullArtPdf", "#includeWithCardPdf"].forEach((selector) => {
   $(selector).addEventListener("change", updateExportSummary);
 });
-
-
 $("#exportButton").addEventListener("click", () => {
-  showToast("Browser PDF and ZIP export is planned for the next milestone.");
+  showToast("Final PDF and ZIP export is scheduled for the next milestone.");
 });
+
+function proofName() {
+  const base = (state.artFile?.name || "extended-art").replace(/\.[^.]+$/, "").replace(/[^a-z0-9]+/gi, "_").replace(/^_+|_+$/g, "").slice(0, 60) || "extended-art";
+  return `${base}_${state.profile}_alignment_proof_300dpi.png`;
+}
+
+function canvasBlob(source) {
+  return new Promise((resolve, reject) => {
+    source.toBlob((blob) => blob ? resolve(blob) : reject(new Error("The proof image could not be encoded.")), "image/png");
+  });
+}
+
+async function downloadProof() {
+  if (!(state.artImage && state.lastCompletedJobId && state.alignmentStatus === "CENTERED_NOT_MATCHED")) return;
+  const button = $("#proofButton");
+  button.disabled = true;
+  try {
+    const profile = activeProfile();
+    const proofCanvas = document.createElement("canvas");
+    proofCanvas.width = profile.master_px[0];
+    proofCanvas.height = profile.master_px[1];
+    const proofContext = proofCanvas.getContext("2d", { alpha: false, colorSpace: "srgb" });
+    drawArtworkProof({ context: proofContext, width: proofCanvas.width, height: proofCanvas.height, state, artImage: state.artImage });
+    const encoded = await canvasBlob(proofCanvas);
+    const output = await withPrintMetadata(encoded, 300);
+    triggerDownload(output, proofName());
+    showToast(`Proof exported at ${pixelPair(profile.master_px)} px with 300-DPI metadata.`);
+  } catch (error) {
+    showToast(error.message);
+  } finally {
+    button.disabled = false;
+  }
+}
+$("#proofButton").addEventListener("click", downloadProof);
 
 new ResizeObserver(requestRender).observe(shell);
 window.addEventListener("resize", requestRender);
+window.addEventListener("beforeunload", () => {
+  ["art", "card"].forEach((kind) => {
+    const previewUrl = state[`${kind}PreviewUrl`];
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    releaseImage(state[`${kind}Image`]);
+  });
+});
 updateSetupSummary();
 updateStudioContract();
 openSetup();
-
-// The browser draft intentionally has no backend health check. Its profile
-// and paper contracts come from the local fallback tables above.

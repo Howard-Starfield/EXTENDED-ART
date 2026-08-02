@@ -8,8 +8,8 @@ This project is intentionally isolated from `ExtendedArt_Offline_Workflow`. The 
 
 - Reference copies of the desktop processor, web UI, tests, and branding are under `reference/`.
 - The browser MVP plan is in `docs/WEB_MVP_PLAN.md`.
-- The detailed execution roadmap is in `docs/ROADMAP.md` (Phase 0 files exist;
-  initial checkpoint commit pending; Phase 1 in progress).
+- The detailed execution roadmap is in `docs/ROADMAP.md` (Phase 1 core
+  implementation is complete; PDF/ZIP parity remains in later phases).
 - Hosting choices and deployment steps are in `docs/HOSTING_SETUP.md`.
 - No customer images or generated packages are copied into this project.
 

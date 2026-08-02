@@ -1,10 +1,14 @@
 # ExtendedArt Web delivery roadmap
 
-Status: Phase 0 implementation complete locally; Phase 1 in progress
+Status: Phase 1 core implementation complete; UX hardening checklist remains
 
-Repository checkpoint: the isolated files exist and the static smoke test has
-passed, but the new repository has not received its first commit yet. Phase 0
-is not release-complete until that checkpoint commit exists.
+Gate record (2026-08-01): `npm.cmd run test` passes 13 tests, `npm.cmd run
+build` passes, and `npm.cmd run test:browser` passes the setup-gate and
+automatic-upload/proof-download flows. The browser project has not been
+published or pushed.
+
+Repository checkpoint: commit 66f2abe contains the Phase 1 browser-local
+workflow and documentation. No remote push or deployment has been performed.
 
 Current launch scope ends with the browser-local print workflow and hosted
 static pilot. Image 2 generation is explicitly excluded from this roadmap.
@@ -159,7 +163,7 @@ after the Vite migration.
 
 Split the current root shell into these modules before Phase 1 is complete:
 
-- src/app-state.js: session state and reset behavior.
+- src/state.js: session state and reset behavior.
 - src/profiles.js: standard, Vault, PSA, photo frame, paper, and version data.
 - src/image-io.js: file validation, EXIF orientation, decoding, and cleanup.
 - src/alignment.js: candidate search, scoring, confidence, and manual offsets.
@@ -365,36 +369,21 @@ Vault Letter must paginate because 282 mm of artwork cannot fit within a
 but many printers cannot print within 3.4 mm of both side edges; keep the
 artwork exact and warn instead of shrinking it.
 
-### Current implementation discrepancies to correct
+### Remaining known gaps for later phases
 
-These are known gaps, not accepted behavior:
+The original shell discrepancies were addressed by the Phase 1 implementation.
+These items remain intentionally deferred and are not presented as completed:
 
-- The current launch gate shows product and paper simultaneously. Phase 1 must
-  turn it into two sequential steps.
-- The current upload copy says Image 2 result. Replace it with Extended artwork;
-  the site accepts artwork from any source and contains no generation feature.
-- The current binder cards say 9 inserts. Setup and export summaries must say
-  8 printed inserts plus your center card while still reporting a 3x3 master.
-- The current original-card drop card says Recommended. It must say Required
-  and block alignment until loaded.
-- The current Auto-align button performs a delayed center-fit only after a
-  click. Phase 1 must auto-start the clearly labeled baseline; Phase 2 replaces
-  it with reference matching.
-- The current Print card in center checkbox is checked for binder modes. It
-  must be off for every profile and must become the optional with-card
-  reference PDF described above.
-- The current desktop and browser page-fit logic scales Vault Letter to about
-  94.90% and 8x10 A4 to about 99.41%. This violates exact physical output and
-  must be replaced by the page-layout matrix before parity can be declared.
-- The desktop internal cutout stroke is centered on the chamber boundary.
-  Move it into the discarded white chamber before calling guide clearance
-  compliant.
-- The browser shell has no real proof, PDF, or ZIP renderer yet. Disabled
-  export controls must not be presented as completed output.
+- The exact physical page-layout matrix, including Vault Letter pagination and
+  8x10 A4 printer-margin warnings, belongs to Phase 3.
+- Cut-guide clearance must move from the browser preview contract into the
+  deterministic PDF renderer in Phase 3.
+- PDF and ZIP generation remain disabled until the package renderer is built;
+  the Phase 1 proof is a separate PNG download.
 
 ## Phase 0 - Isolate the web project and freeze the contract
 
-Status: Implementation complete locally; checkpoint commit pending
+Status: Complete; commit c9a1853
 
 Goal: Create a safe browser workspace beside the desktop application and make
 the desktop output contract explicit before moving logic.
@@ -431,16 +420,16 @@ but the desktop application remains available as the trusted production tool.
 - The isolated repository has an initial checkpoint commit containing only the
   intended web source, references, and documentation.
 
-### Remaining checkpoint task
+### Checkpoint task
 
-- [ ] P0-01 Review the untracked file list, run the static smoke check, confirm
+- [x] P0-01 Review the untracked file list, run the static smoke check, confirm
       no customer images or secrets are present, and create the initial web
       repository commit. Do not push or deploy without an explicit release
-      request.
+      request. Completed in c9a1853.
 
 ## Phase 1 - Browser-local studio and proof output
 
-Status: In progress
+Status: Core implementation complete; UX hardening checklist remains
 
 Goal: Let one person choose the product and paper first, upload both required
 images, watch a locked automatic alignment run to completion, fine-tune the
@@ -459,7 +448,7 @@ Estimated effort: 2-3 sessions
 - Manual pan, zoom, reset, and keyboard nudging.
 - Automatic alignment triggered after both images finish decoding.
 - Blocking progress layer that prevents scene edits while alignment runs.
-- Progress stages for reading, matching, refining, and preparing the preview.
+- Progress stages for reading, normalizing, and preparing the preview.
 - Live A4 and Letter visual comparison.
 - Corner roundness preview.
 - A proof PNG download that reflects the current scene.
@@ -587,41 +576,41 @@ small output that proves the scene model and preview are connected.
 
 ### Ordered implementation checklist
 
-- [ ] P1-01 Add package.json, package-lock.json, Vite, Vitest, Playwright, and
+- [x] P1-01 Add package.json, package-lock.json, Vite, Vitest, Playwright, and
       required scripts; verify the existing dist/ and test-artifact ignore
       rules; confirm the current shell builds before changing behavior.
-- [ ] P1-02 Move state, profiles, image intake, rendering, quality, and worker
+- [x] P1-02 Move state, profiles, image intake, rendering, quality, and worker
       ownership into the documented src/ modules without changing visible
       geometry.
-- [ ] P1-03 Replace the combined launch gate with the two-step product/paper
+- [x] P1-03 Replace the combined launch gate with the two-step product/paper
       wizard and correct every 9 inserts label to 8 printed inserts plus card.
-- [ ] P1-04 Implement signature-based image validation, the fixed byte/pixel
+- [x] P1-04 Implement signature-based image validation, the fixed byte/pixel
       limits, orientation-safe decoding, preview lifecycle, and object cleanup.
-- [ ] P1-05 Make both uploads required, remove Image 2 wording, and auto-start
+- [x] P1-05 Make both uploads required, remove Image 2 wording, and auto-start
       one cancellable center-fit job when both current assets are ready.
-- [ ] P1-06 Implement the blocking progress dialog, job ids, stale-result
+- [x] P1-06 Implement the blocking progress dialog, job ids, stale-result
       rejection, focus handling, timeout/error states, and control locking.
-- [ ] P1-07 Implement correction controls with the specified zoom, opacity,
+- [x] P1-07 Implement correction controls with the specified zoom, opacity,
       nudge, reset, pointer, keyboard, and touch behavior.
-- [ ] P1-08 Implement the clean alignment-proof PNG path, including exact master
+- [x] P1-08 Implement the clean alignment-proof PNG path, including exact master
       dimensions, sRGB output, and the 11811-pixels-per-meter pHYs chunk.
-- [ ] P1-09 Implement effective-DPI classification and all user-facing quality
+- [x] P1-09 Implement effective-DPI classification and all user-facing quality
       messages without trusting source DPI metadata.
-- [ ] P1-10 Complete the Phase 1 automated and real-browser checklist and record
+- [x] P1-10 Complete the Phase 1 automated and real-browser checklist and record
       the gate result before starting reference matching.
 
 ### Quality and testing checklist
 
-- [ ] Add browser unit tests for millimeter-to-pixel and aspect-ratio math.
-- [ ] Add tests for file type, file size, and missing-reference states.
-- [ ] Add boundary tests for 50 MiB, 80 megapixels, and 16,384-pixel limits.
-- [ ] Add tests that the second decoded image automatically starts alignment.
+- [x] Add browser unit tests for millimeter-to-pixel and aspect-ratio math.
+- [x] Add tests for file type, file size, and missing-reference states.
+- [x] Add boundary tests for 50 MiB, 80 megapixels, and 16,384-pixel limits.
+- [x] Add tests that the second decoded image automatically starts alignment.
 - [ ] Add tests that pointer, keyboard, paper, mode, and export actions are
       ignored while alignment is active.
-- [ ] Add tests for cancellation and stale-job rejection.
+- [x] Add tests for cancellation and stale-job rejection.
 - [ ] Add a fixture with a synthetic 3x3 scene and a known center card.
-- [ ] Verify the proof PNG has the exact profile master pixel dimensions.
-- [ ] Verify the proof PNG has a 11811-pixels-per-meter pHYs chunk and never
+- [x] Verify the proof PNG has the exact profile master pixel dimensions.
+- [x] Verify the proof PNG has a 11811-pixels-per-meter pHYs chunk and never
       contains the original card overlay or UI guides.
 - [ ] Verify corner radius changes the alpha mask without changing dimensions.
 - [ ] Verify replacing an image revokes the old object URL.

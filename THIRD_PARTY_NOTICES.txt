@@ -10,3 +10,18 @@ when bundled into ExtendedArtOffline.exe:
   https://pyinstaller.org/
 
 Review the packages' full license files before redistributing the executable.
+
+Web build dependencies:
+
+- Vite (MIT license)
+  https://vite.dev/
+- Vitest (MIT license)
+  https://vitest.dev/
+- Playwright (Apache-2.0 license)
+  https://playwright.dev/
+- pdf-lib (MIT license)
+  https://pdf-lib.js.org/
+- @zip.js/zip.js (BSD-3-Clause license)
+  https://gildas-lormeau.github.io/zip.js/
+
+The exact versions used by a checkout are recorded in package-lock.json.
