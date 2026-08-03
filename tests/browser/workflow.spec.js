@@ -44,6 +44,74 @@ function pngFromRows(width, height, rows) {
   ]);
 }
 
+const FEATURE_CARD_WIDTH = 252;
+const FEATURE_CARD_HEIGHT = 352;
+const FEATURE_ART_WIDTH = 840;
+const FEATURE_ART_HEIGHT = 1176;
+const FEATURE_ARTWORK_REGION = { left: 24, top: 28, right: 228, bottom: 214 };
+
+function featureNoise(x, y) {
+  return ((x * 73856093 ^ y * 19349663 ^ (x * y * 83492791)) >>> 0) % 256;
+}
+
+function featureTexture(x, y, variant = 0) {
+  const texture = variant === 0
+    ? featureNoise(x, y) + featureNoise(x * 3, y * 5) + ((x * 17 + y * 11) % 97)
+    : featureNoise(x * 5 + 19, y * 7 + 23) + featureNoise(x * 11 + 29, y * 2 + 31) + ((x * 7 + y * 19) % 113);
+  return Math.round(15 + (texture % 256) * 0.82);
+}
+
+function featureCardPixel(x, y, variant = 0) {
+  if (x >= FEATURE_ARTWORK_REGION.left && x < FEATURE_ARTWORK_REGION.right
+    && y >= FEATURE_ARTWORK_REGION.top && y < FEATURE_ARTWORK_REGION.bottom) {
+    return featureTexture(x, y, variant);
+  }
+  return 205 - ((x * 3 + y * 5) % 12);
+}
+
+function rgbaRows(width, height, pixelAt) {
+  const rows = Buffer.alloc((width * 4 + 1) * height);
+  for (let y = 0; y < height; y += 1) {
+    const rowOffset = y * (width * 4 + 1);
+    for (let x = 0; x < width; x += 1) {
+      const value = Math.max(0, Math.min(255, pixelAt(x, y)));
+      const pixelOffset = rowOffset + 1 + x * 4;
+      rows[pixelOffset] = value;
+      rows[pixelOffset + 1] = value;
+      rows[pixelOffset + 2] = value;
+      rows[pixelOffset + 3] = 255;
+    }
+  }
+  return rows;
+}
+
+function featureCardPng(variant = 0) {
+  return pngFromRows(
+    FEATURE_CARD_WIDTH,
+    FEATURE_CARD_HEIGHT,
+    rgbaRows(FEATURE_CARD_WIDTH, FEATURE_CARD_HEIGHT, (x, y) => featureCardPixel(x, y, variant)),
+  );
+}
+
+function featureScenePng({
+  width = FEATURE_ART_WIDTH,
+  height = FEATURE_ART_HEIGHT,
+  cardLeft = 250,
+  cardTop = 350,
+  cardScale = 0.98,
+  sceneCardVariant = 0,
+} = {}) {
+  return pngFromRows(width, height, rgbaRows(width, height, (x, y) => {
+    const sourceX = (x - cardLeft) / cardScale;
+    const sourceY = (y - cardTop) / cardScale;
+    if (sourceX >= FEATURE_ARTWORK_REGION.left && sourceX < FEATURE_ARTWORK_REGION.right
+      && sourceY >= FEATURE_ARTWORK_REGION.top && sourceY < FEATURE_ARTWORK_REGION.bottom) {
+      return featureTexture(Math.floor(sourceX), Math.floor(sourceY), sceneCardVariant);
+    }
+    return 30 + ((x * 9 + y * 7 + featureNoise(x >> 3, y >> 3)) % 40);
+  }));
+}
+
 function syntheticGridPng(width, height) {
   const rows = Buffer.alloc((width * 4 + 1) * height);
   const colors = [
@@ -245,6 +313,82 @@ test("auto-aligns after both required images decode", async ({ page }) => {
   expect(pieceBytes.readUInt32BE(16)).toBe(744);
   expect(pieceBytes.readUInt32BE(20)).toBe(1039);
   await optionalReader.close();
+});
+
+test("worker v4 auto-applies a translated and scaled local-feature match", async ({ page }) => {
+  await page.goto("/");
+  await page.locator("label.mode-card").first().click();
+  await page.locator("label.paper-card").first().click();
+  await page.getByRole("button", { name: "Open alignment studio" }).click();
+
+  await page.setInputFiles("#artInput", {
+    name: "feature-scene.png",
+    mimeType: "image/png",
+    buffer: featureScenePng(),
+  });
+  const progressVisible = page.locator("#alignmentProgress").waitFor({ state: "visible" });
+  await page.setInputFiles("#cardInput", {
+    name: "feature-card.png",
+    mimeType: "image/png",
+    buffer: featureCardPng(),
+  });
+  await progressVisible;
+  await expect(page.locator("#alignmentProgress")).toBeHidden({ timeout: 20_000 });
+  await expect(page.locator("#autoAlignStatus")).toHaveAttribute(
+    "data-alignment-status",
+    "MATCH_APPLIED",
+  );
+  await expect(page.locator("#autoAlignStatus")).toContainText(
+    "Local card-art features passed deterministic RANSAC",
+  );
+  await expect(page.locator("#proofButton")).toBeEnabled();
+
+  const zoomPercent = Number((await page.locator("#zoomValue").textContent()).replace("%", ""));
+  expect(zoomPercent).toBeGreaterThan(105);
+  expect(zoomPercent).toBeLessThan(125);
+  const offsetText = await page.locator("#offsetValue").textContent();
+  expect(offsetText).toMatch(/^X -?\d+ \/ Y -?\d+$/);
+  const [, xPixels, yPixels] = offsetText.match(/^X (-?\d+) \/ Y (-?\d+)$/);
+  expect(Math.abs(Number(xPixels))).toBeGreaterThan(40);
+  expect(Math.abs(Number(yPixels))).toBeGreaterThan(40);
+});
+
+test("keeps the baseline and gives actionable overscan guidance for an insufficient scene", async ({ page }) => {
+  await page.goto("/");
+  await page.locator("label.mode-card").first().click();
+  await page.locator("label.paper-card").first().click();
+  await page.getByRole("button", { name: "Open alignment studio" }).click();
+
+  await expect(page.locator("#zoomValue")).toHaveText("100%");
+  await expect(page.locator("#offsetValue")).toHaveText("X 0 / Y 0");
+  await page.setInputFiles("#artInput", {
+    name: "insufficient-feature-scene.png",
+    mimeType: "image/png",
+    buffer: featureScenePng({
+      width: FEATURE_CARD_WIDTH,
+      height: FEATURE_CARD_HEIGHT,
+      cardLeft: 0,
+      cardTop: 0,
+      cardScale: 1,
+    }),
+  });
+  const progressVisible = page.locator("#alignmentProgress").waitFor({ state: "visible" });
+  await page.setInputFiles("#cardInput", {
+    name: "insufficient-feature-card.png",
+    mimeType: "image/png",
+    buffer: featureCardPng(),
+  });
+  await progressVisible;
+  await expect(page.locator("#alignmentProgress")).toBeHidden({ timeout: 20_000 });
+  await expect(page.locator("#autoAlignStatus")).toHaveAttribute(
+    "data-alignment-status",
+    "MATCH_UNCERTAIN",
+  );
+  await expect(page.locator("#autoAlignStatus")).toContainText("needs more surrounding artwork");
+  await expect(page.locator("#autoAlignStatus")).toContainText("current alignment was kept");
+  await expect(page.locator("#autoAlignStatus")).toContainText("required surrounding canvas");
+  await expect(page.locator("#zoomValue")).toHaveText("100%");
+  await expect(page.locator("#offsetValue")).toHaveText("X 0 / Y 0");
 });
 
 test("uses the typed-pixel matcher fallback without bitmap worker APIs", async ({ page }) => {

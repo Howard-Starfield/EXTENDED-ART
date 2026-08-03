@@ -1,7 +1,7 @@
 import { searchTransforms } from "./matcher-core.js";
 
 const MAX_COMPARISON_LONGEST = 1200;
-const TRANSPORT_VERSION = "alignment-worker-v3";
+const TRANSPORT_VERSION = "alignment-worker-v4";
 const MATCH_APPLIED = "MATCH_APPLIED";
 const MATCH_UNCERTAIN = "MATCH_UNCERTAIN";
 const TIMED_OUT = "TIMED_OUT";
@@ -152,7 +152,13 @@ function rasterizePixelPayload(image) {
   const scale = Math.min(1, MAX_COMPARISON_LONGEST / Math.max(sourceWidth, sourceHeight));
   const width = Math.max(1, Math.round(sourceWidth * scale));
   const height = Math.max(1, Math.round(sourceHeight * scale));
-  return { gray: resizeGray(gray, sourceWidth, sourceHeight, width, height), width, height };
+  return {
+    gray: resizeGray(gray, sourceWidth, sourceHeight, width, height),
+    width,
+    height,
+    sourceWidth: Number(image?.sourceWidth ?? image?.source_width ?? sourceWidth) || sourceWidth,
+    sourceHeight: Number(image?.sourceHeight ?? image?.source_height ?? sourceHeight) || sourceHeight,
+  };
 }
 
 function rasterizeBitmap(image) {
@@ -177,7 +183,13 @@ function rasterizeBitmap(image) {
   try {
     context.drawImage(image, 0, 0, width, height);
     const pixels = context.getImageData(0, 0, width, height).data;
-    return { gray: grayscaleFromPixels(pixels, width, height, "rgba"), width, height };
+    return {
+      gray: grayscaleFromPixels(pixels, width, height, "rgba"),
+      width,
+      height,
+      sourceWidth,
+      sourceHeight,
+    };
   } finally {
     image.close?.();
   }
@@ -192,6 +204,10 @@ function rasterize(image) {
 function coreProgressStage(coreStage) {
   const label = String(coreStage || "Matching transforms");
   const normalized = label.toLowerCase();
+  if (normalized.includes("feature") && normalized.includes("descriptor")) return { key: "feature-match", label };
+  if (normalized.includes("robust")) return { key: "feature-ransac", label };
+  if (normalized.includes("compatib")) return { key: "feature-coverage", label };
+  if (normalized.includes("feature")) return { key: "features", label };
   if (normalized.includes("coarse")) return { key: "match-coarse", label };
   if (normalized.includes("refin")) return { key: "match-refine", label };
   if (normalized.includes("result")) return { key: "result", label };
@@ -267,9 +283,13 @@ async function runMatch(message) {
     art: art.gray,
     artWidth: art.width,
     artHeight: art.height,
+    artSourceWidth: art.sourceWidth,
+    artSourceHeight: art.sourceHeight,
     card: card.gray,
     cardWidth: card.width,
     cardHeight: card.height,
+    cardSourceWidth: card.sourceWidth,
+    cardSourceHeight: card.sourceHeight,
     masterWidth: masterPixels[0],
     masterHeight: masterPixels[1],
     cardBox,
@@ -339,7 +359,9 @@ self.onmessage = async (event) => {
   try {
     await runMatch(message);
   } catch (error) {
-    postFailure(jobId, profileVersion, error);
+    postFailure(jobId, profileVersion, cancellationRequested() || error?.name === "AbortError"
+      ? matcherError(CANCELLED, currentStageKey, "Cancellation requested by the caller.")
+      : error);
   } finally {
     if (activeJobId === jobId) {
       activeJobId = null;

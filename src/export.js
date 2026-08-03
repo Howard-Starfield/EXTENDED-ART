@@ -91,7 +91,7 @@ function printInstructions({ profile, papers, layouts, options, memory }) {
   return lines.join("\n") + "\n";
 }
 
-function sourceManifest(state, profile, paper, alignment, options, layout, papers, layouts) {
+export function sourceManifest(state, profile, paper, alignment, options, layout, papers, layouts) {
   const serializedAlignment = serializeAlignmentDiagnostics(alignment, {
     currentTransform: { zoom: state.zoom, offsetX: state.offsetX, offsetY: state.offsetY },
     preservedAlignment: Boolean(state.lastStableAlignment),

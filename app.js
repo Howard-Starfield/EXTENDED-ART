@@ -402,10 +402,19 @@ function alignmentUserMessage(result) {
   const evidence = alignmentEvidence(result).join(" ");
   const evidenceText = evidence ? ` Evidence: ${evidence}` : "";
   const reason = sanitizeDiagnosticText(result?.reason);
+  const rejection = result?.rejectionClassification
+    || result?.diagnostics?.rejectionClassification
+    || result?.diagnostics?.compatibility?.rejectionReason;
   if (status === ALIGNMENT_STATUSES.APPLIED) {
     return `Reference match applied.${evidenceText} Inspect the card edges and fine-tune if needed.`;
   }
   if (status === ALIGNMENT_STATUSES.UNCERTAIN) {
+    if (rejection === "INSUFFICIENT_OVERSCAN") {
+      return `${reason || "Card artwork was found, but the image needs more surrounding artwork."} The current alignment was kept; use a scene with the required surrounding canvas before printing.`;
+    }
+    if (typeof rejection === "string" && rejection.endsWith("_BEYOND_RENDERER_CONTRACT")) {
+      return `${reason || "Card artwork was found, but its geometry is incompatible with the zoom-and-translation renderer."} The current alignment was kept.`;
+    }
     return `Automatic reference matching was inconclusive.${evidenceText} Manual correction is required; the current alignment was kept.`;
   }
   if (status === ALIGNMENT_STATUSES.TIMED_OUT) {
@@ -430,7 +439,7 @@ function setAlignmentStatus(result, { toast = true } = {}) {
     showToast(result.status === ALIGNMENT_STATUSES.APPLIED
       ? "Reference match applied."
       : result.status === ALIGNMENT_STATUSES.UNCERTAIN
-        ? "Automatic match was inconclusive; current alignment retained."
+        ? alignmentUserMessage(result)
         : alignmentUserMessage(result));
   }
 }
@@ -565,6 +574,8 @@ async function cloneForMatcher(image) {
   return {
     width,
     height,
+    sourceWidth,
+    sourceHeight,
     pixelFormat: "rgba",
     data: fallbackContext.getImageData(0, 0, width, height).data,
   };

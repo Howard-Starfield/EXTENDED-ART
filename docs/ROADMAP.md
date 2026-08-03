@@ -1,15 +1,15 @@
 # ExtendedArt Web delivery roadmap
 
-Status: Phase 3 implementation complete; release audit and Phase 2 real-image audit remain pending
+Status: Phase 3 implementation complete; Alignment v4 local-feature audit passed for one permissioned local pair; broader release audit remains pending
 
-Gate record (2026-08-02): `npm.cmd run test` passes 47 tests, `npm.cmd run
-build` passes, and `npm.cmd run test:browser` passes all 3 browser tests,
-including worker-backed matching, progress locking, fallback messaging,
+Gate record (2026-08-02): `npm.cmd run test` passes 67 tests across 16 files,
+`npm.cmd run build` passes, and `npm.cmd run test:browser` passes all 7 browser
+tests, including worker-backed local-feature matching, progress locking, fallback messaging,
 deterministic master/piece geometry, PSA/frame/binder masks, quality-report
 diagnostics, synthetic matcher release gates, exact PDFs, deterministic ZIP
 assembly, default/optional package downloads, optional PNG dimensions and print
-metadata, correction, and proof-download flows. The browser project has not
-been published or pushed.
+metadata, correction, and proof-download flows. Alignment v4 is locally
+verified but has not yet been pushed or deployed.
 
 Repository checkpoints: commit 0755713 contains the Phase 1 browser-local
 workflow; b58e40e is the Phase 1 hardening checkpoint; 6dd498c contains the

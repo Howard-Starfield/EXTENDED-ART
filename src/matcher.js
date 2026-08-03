@@ -1,4 +1,4 @@
-export const MATCHER_TRANSPORT_VERSION = "alignment-worker-v3";
+export const MATCHER_TRANSPORT_VERSION = "alignment-worker-v4";
 
 export const MATCHER_STATUSES = Object.freeze({
   APPLIED: "MATCH_APPLIED",
@@ -13,6 +13,10 @@ export const MATCHER_STAGES = Object.freeze({
   DISPATCH: `${MATCHER_TRANSPORT_VERSION}:dispatch`,
   PREPARE_ART: `${MATCHER_TRANSPORT_VERSION}:prepare-art`,
   PREPARE_CARD: `${MATCHER_TRANSPORT_VERSION}:prepare-card`,
+  FEATURES: `${MATCHER_TRANSPORT_VERSION}:features`,
+  FEATURE_MATCH: `${MATCHER_TRANSPORT_VERSION}:feature-match`,
+  FEATURE_RANSAC: `${MATCHER_TRANSPORT_VERSION}:feature-ransac`,
+  FEATURE_COVERAGE: `${MATCHER_TRANSPORT_VERSION}:feature-coverage`,
   MATCH: `${MATCHER_TRANSPORT_VERSION}:match`,
   RESULT: `${MATCHER_TRANSPORT_VERSION}:result`,
   SLOW: `${MATCHER_TRANSPORT_VERSION}:slow`,

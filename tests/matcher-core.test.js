@@ -51,6 +51,8 @@ describe("deterministic reference matcher", () => {
     const exact = coverageDiagnostics(100, 120, 100, 120, { zoom: 1, offsetX: 0, offsetY: 0 });
     const uncovered = coverageDiagnostics(100, 120, 100, 120, { zoom: 1, offsetX: 0.01, offsetY: 0 });
     expect(MATCHER_CONFIG.borderExclusion).toBeCloseTo(0.03, 6);
+    expect(MATCH_GATES.minimumScore).toBe(0.78);
+    expect(MATCH_GATES.minimumMargin).toBe(0.06);
     expect(exact.covered).toBe(true);
     expect(exact.requiredOverscanPx).toBe(2);
     expect(uncovered.covered).toBe(false);

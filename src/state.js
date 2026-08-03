@@ -1,4 +1,4 @@
-export const ALIGNMENT_STATUS_VERSION = "alignment-v3.0";
+export const ALIGNMENT_STATUS_VERSION = "alignment-v4.0";
 
 export const ALIGNMENT_STATUSES = Object.freeze({
   APPLIED: "MATCH_APPLIED",

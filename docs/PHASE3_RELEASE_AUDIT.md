@@ -7,11 +7,11 @@ Scope: browser-local PDF, PNG, and ZIP print-package pipeline
 
 The current synthetic release gate passes:
 
-- `npm.cmd run test` — 47 tests passed across 15 files.
+- `npm.cmd run test` — 67 tests passed across 16 files.
 - `npm.cmd run build` — production build succeeds. The export engine remains a
   lazy-loaded chunk so the initial application bundle stays small; Vite reports
   the 581 KB minified export chunk as an optimization warning.
-- `npm.cmd run test:browser` — all 3 Playwright tests passed.
+- `npm.cmd run test:browser` — all 7 Playwright tests passed.
 
 The browser workflow test verifies the default and opt-in ZIP contracts. The
 default archive contains only the cut-ready PDF, print guide, instructions,

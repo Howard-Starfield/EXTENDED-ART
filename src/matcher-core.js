@@ -3,6 +3,7 @@ import {
   MATCHER_CONFIG_VERSION,
   MATCH_GATES as CONFIG_GATES,
 } from "./matcher-config.js";
+import { matchLocalFeatures } from "./feature-matcher.js";
 
 export { MATCHER_CONFIG, MATCHER_CONFIG_VERSION };
 
@@ -290,6 +291,12 @@ function mergeConfig(config = MATCHER_CONFIG) {
       refinement: { ...MATCHER_CONFIG.search.refinement, ...(config.search?.refinement || {}) },
     },
     scoring: { ...MATCHER_CONFIG.scoring, ...(config.scoring || {}) },
+    features: {
+      ...MATCHER_CONFIG.features,
+      ...(config.features || {}),
+      roiGrid: { ...MATCHER_CONFIG.features.roiGrid, ...(config.features?.roiGrid || {}) },
+      pyramidScales: config.features?.pyramidScales || MATCHER_CONFIG.features.pyramidScales,
+    },
     coverage: { ...MATCHER_CONFIG.coverage, ...(config.coverage || {}) },
   };
 }
@@ -599,7 +606,7 @@ function failureReasons({ scoreGate, marginGate, supportGate, levelGate, periodi
   return reasons;
 }
 
-export function searchTransforms({
+export function searchCorrelationTransforms({
   art,
   artWidth,
   artHeight,
@@ -613,6 +620,7 @@ export function searchTransforms({
   comparisonHeight = 240,
   config = MATCHER_CONFIG,
   onProgress,
+  shouldCancel,
 }) {
   const startedAt = Date.now();
   const matcherConfig = mergeConfig(config);
@@ -668,6 +676,11 @@ export function searchTransforms({
   }
 
   function emitProgress(stage, completed, total, start, span) {
+    if (shouldCancel?.()) {
+      const error = new Error("Cancellation requested by the caller.");
+      error.name = "AbortError";
+      throw error;
+    }
     onProgress?.({
       stage,
       completedWork: completed,
@@ -691,6 +704,11 @@ export function searchTransforms({
   for (const zoom of zoomValues) {
     for (const offsetY of offsetValues) {
       for (const offsetX of offsetValues) {
+        if ((coarseCompleted & 0x0f) === 0 && shouldCancel?.()) {
+          const error = new Error("Cancellation requested by the caller.");
+          error.name = "AbortError";
+          throw error;
+        }
         evaluateCandidate({ zoom, offsetX, offsetY }, 0);
         coarseCompleted += 1;
         if (coarseCompleted % 8 === 0 || coarseCompleted === coarseTotal) {
@@ -718,8 +736,13 @@ export function searchTransforms({
     });
     const total = Math.max(1, candidates.length);
     let completed = 0;
-    for (const transform of candidates) {
-      evaluateCandidate(transform, levelIndex);
+      for (const transform of candidates) {
+        if ((completed & 0x0f) === 0 && shouldCancel?.()) {
+          const error = new Error("Cancellation requested by the caller.");
+          error.name = "AbortError";
+          throw error;
+        }
+        evaluateCandidate(transform, levelIndex);
       completed += 1;
       refinementEvaluations += 1;
       if (completed % 10 === 0 || completed === total) {
@@ -863,5 +886,403 @@ export function searchTransforms({
       ? "Aggregate card evidence passed the score, margin, coverage, and ambiguity gates."
       : reasons.join("; ") || "No reliable automatic match was produced.",
     gates,
+  };
+}
+
+function copyBox(box) {
+  if (!box) return null;
+  return {
+    left: box.left,
+    top: box.top,
+    right: box.right,
+    bottom: box.bottom,
+    width: box.width,
+    height: box.height,
+    centerX: box.centerX,
+    centerY: box.centerY,
+  };
+}
+
+function scaleBox(box, scaleX, scaleY) {
+  if (!box) return null;
+  return {
+    left: box.left * scaleX,
+    top: box.top * scaleY,
+    right: box.right * scaleX,
+    bottom: box.bottom * scaleY,
+    width: box.width * scaleX,
+    height: box.height * scaleY,
+    centerX: box.centerX * scaleX,
+    centerY: box.centerY * scaleY,
+  };
+}
+
+function normalizeBox(box, width, height) {
+  if (!box || width <= 0 || height <= 0) return null;
+  return {
+    left: box.left / width,
+    top: box.top / height,
+    right: box.right / width,
+    bottom: box.bottom / height,
+    width: box.width / width,
+    height: box.height / height,
+    centerX: box.centerX / width,
+    centerY: box.centerY / height,
+  };
+}
+
+function scaleMargins(margins, scaleX, scaleY) {
+  return {
+    left: margins.left * scaleX,
+    right: margins.right * scaleX,
+    top: margins.top * scaleY,
+    bottom: margins.bottom * scaleY,
+    width: margins.width * scaleX,
+    height: margins.height * scaleY,
+  };
+}
+
+function overscanDiagnostics({
+  coverage,
+  estimatedCardBox,
+  artWidth,
+  artHeight,
+  artSourceWidth,
+  artSourceHeight,
+  masterWidth,
+  masterHeight,
+}) {
+  const geometry = coverage.geometry;
+  const requiredBounds = {
+    left: (0 - geometry.left) / geometry.scale,
+    top: (0 - geometry.top) / geometry.scale,
+    right: (masterWidth - geometry.left) / geometry.scale,
+    bottom: (masterHeight - geometry.top) / geometry.scale,
+  };
+  const requiredMargins = {
+    left: Math.max(0, estimatedCardBox.left - requiredBounds.left),
+    right: Math.max(0, requiredBounds.right - estimatedCardBox.right),
+    top: Math.max(0, estimatedCardBox.top - requiredBounds.top),
+    bottom: Math.max(0, requiredBounds.bottom - estimatedCardBox.bottom),
+    width: 0,
+    height: 0,
+  };
+  const availableMargins = {
+    left: Math.max(0, estimatedCardBox.left),
+    right: Math.max(0, artWidth - estimatedCardBox.right),
+    top: Math.max(0, estimatedCardBox.top),
+    bottom: Math.max(0, artHeight - estimatedCardBox.bottom),
+    width: 0,
+    height: 0,
+  };
+  const shortfall = {
+    left: Math.max(0, requiredMargins.left - availableMargins.left),
+    right: Math.max(0, requiredMargins.right - availableMargins.right),
+    top: Math.max(0, requiredMargins.top - availableMargins.top),
+    bottom: Math.max(0, requiredMargins.bottom - availableMargins.bottom),
+    width: 0,
+    height: 0,
+  };
+  requiredMargins.width = requiredMargins.left + estimatedCardBox.width + requiredMargins.right;
+  requiredMargins.height = requiredMargins.top + estimatedCardBox.height + requiredMargins.bottom;
+  availableMargins.width = availableMargins.left + estimatedCardBox.width + availableMargins.right;
+  availableMargins.height = availableMargins.top + estimatedCardBox.height + availableMargins.bottom;
+  shortfall.width = shortfall.left + shortfall.right;
+  shortfall.height = shortfall.top + shortfall.bottom;
+  const sourceScaleX = finiteOr(artSourceWidth, artWidth) / artWidth;
+  const sourceScaleY = finiteOr(artSourceHeight, artHeight) / artHeight;
+  const sourceRequiredBounds = {
+    left: requiredBounds.left * sourceScaleX,
+    top: requiredBounds.top * sourceScaleY,
+    right: requiredBounds.right * sourceScaleX,
+    bottom: requiredBounds.bottom * sourceScaleY,
+    width: (requiredBounds.right - requiredBounds.left) * sourceScaleX,
+    height: (requiredBounds.bottom - requiredBounds.top) * sourceScaleY,
+  };
+  return {
+    covered: coverage.covered,
+    workingPx: {
+      requiredCanvas: {
+        width: requiredBounds.right - requiredBounds.left,
+        height: requiredBounds.bottom - requiredBounds.top,
+      },
+      requiredSurroundingMargins: requiredMargins,
+      availableSurroundingMargins: availableMargins,
+      shortfall,
+    },
+    sourcePx: {
+      requiredCanvas: { width: sourceRequiredBounds.width, height: sourceRequiredBounds.height },
+      requiredBounds: sourceRequiredBounds,
+      requiredSurroundingMargins: scaleMargins(requiredMargins, sourceScaleX, sourceScaleY),
+      availableSurroundingMargins: scaleMargins(availableMargins, sourceScaleX, sourceScaleY),
+      shortfall: scaleMargins(shortfall, sourceScaleX, sourceScaleY),
+    },
+  };
+}
+
+function overscanReason(overscan) {
+  const shortfall = overscan?.sourcePx?.shortfall;
+  if (!shortfall) return "Card artwork was found, but the image needs more surrounding artwork.";
+  const parts = [
+    ["left", shortfall.left],
+    ["right", shortfall.right],
+    ["top", shortfall.top],
+    ["bottom", shortfall.bottom],
+  ]
+    .filter(([, value]) => value > 0.5)
+    .map(([side, value]) => `${Math.ceil(value)} px ${side}`);
+  const canvas = overscan.sourcePx.requiredCanvas;
+  if (!parts.length) {
+    return `Card artwork was found, but the image needs more surrounding artwork to reach about ${Math.ceil(canvas.width)} x ${Math.ceil(canvas.height)} px.`;
+  }
+  return `Card artwork was found, but the image needs more surrounding artwork. Extend it by at least ${parts.join(", ")} (about ${Math.ceil(canvas.width)} x ${Math.ceil(canvas.height)} px total).`;
+}
+
+function featureEvidenceItems({ accepted, rejectionClassification, overscan, repeatedPattern }) {
+  if (accepted) {
+    return ["Local card-art features passed deterministic RANSAC, compatibility, and coverage gates."];
+  }
+  if (rejectionClassification === "INSUFFICIENT_OVERSCAN") {
+    return ["Card artwork was found, but the image needs more surrounding artwork.", overscanReason(overscan)];
+  }
+  if (rejectionClassification === "ROTATION_BEYOND_RENDERER_CONTRACT") {
+    return ["Card artwork was found, but its rotation exceeds the zoom-and-translation renderer tolerance."];
+  }
+  if (["PERSPECTIVE_BEYOND_RENDERER_CONTRACT", "AFFINE_BEYOND_RENDERER_CONTRACT"].includes(rejectionClassification)) {
+    return ["Card artwork was found, but perspective or non-uniform distortion exceeds the zoom-and-translation renderer contract."];
+  }
+  if (repeatedPattern) return ["The reference texture was too repetitive to distinguish uniquely."];
+  return ["The matcher did not find enough distinct local feature evidence for an automatic apply."];
+}
+
+function featureResult({
+  feature,
+  artWidth,
+  artHeight,
+  artSourceWidth = artWidth,
+  artSourceHeight = artHeight,
+  cardWidth,
+  cardHeight,
+  masterWidth,
+  masterHeight,
+  cardBox,
+  baseline,
+  matcherConfig,
+  periodicity,
+}) {
+  if (!feature?.correspondenceFound) return null;
+  const baselineTransform = normalizeTransform(baseline);
+  const featureConfig = matcherConfig.features;
+  const estimatedCardBox = feature.estimatedCardBox;
+  const similarity = feature.similarity;
+  const periodicityGate = periodicity < matcherConfig.scoring.maximumPeriodicity;
+  const repeatedPattern = !periodicityGate;
+  let rejectionClassification = feature.compatibility?.rejectionReason || null;
+  let requiredTransform = null;
+  let coverage = null;
+  let overscan = null;
+  let aspectMismatch = null;
+
+  if (similarity && estimatedCardBox) {
+    const targetWidth = (cardBox[2] - cardBox[0]) * masterWidth;
+    const targetHeight = (cardBox[3] - cardBox[1]) * masterHeight;
+    const requiredScaleX = targetWidth / Math.max(EPSILON, similarity.scale * cardWidth);
+    const requiredScaleY = targetHeight / Math.max(EPSILON, similarity.scale * cardHeight);
+    aspectMismatch = Math.abs(requiredScaleX - requiredScaleY) / Math.max(EPSILON, (requiredScaleX + requiredScaleY) / 2);
+    if (!rejectionClassification && aspectMismatch > featureConfig.maximumScaleMismatch) {
+      rejectionClassification = "ASPECT_RATIO_BEYOND_RENDERER_CONTRACT";
+    }
+    const scale = (requiredScaleX + requiredScaleY) / 2;
+    const cardCenterX = (cardBox[0] + cardBox[2]) * masterWidth / 2;
+    const cardCenterY = (cardBox[1] + cardBox[3]) * masterHeight / 2;
+    const left = cardCenterX - estimatedCardBox.centerX * scale;
+    const top = cardCenterY - estimatedCardBox.centerY * scale;
+    const baseScale = Math.max(masterWidth / artWidth, masterHeight / artHeight);
+    requiredTransform = {
+      zoom: scale / baseScale,
+      offsetX: (left - (masterWidth - artWidth * scale) / 2) / masterWidth,
+      offsetY: (top - (masterHeight - artHeight * scale) / 2) / masterHeight,
+    };
+    coverage = coverageDiagnostics(artWidth, artHeight, masterWidth, masterHeight, requiredTransform, matcherConfig);
+    overscan = overscanDiagnostics({
+      coverage,
+      estimatedCardBox,
+      artWidth,
+      artHeight,
+      artSourceWidth,
+      artSourceHeight,
+      masterWidth,
+      masterHeight,
+    });
+  }
+
+  const featureEvidenceGate = Boolean(feature.confidenceGates?.passed);
+  const compatibilityGate = !rejectionClassification && similarity && estimatedCardBox && requiredTransform;
+  const coverageGate = Boolean(coverage?.covered);
+  if (!rejectionClassification && featureEvidenceGate && periodicityGate && compatibilityGate && !coverageGate) {
+    rejectionClassification = "INSUFFICIENT_OVERSCAN";
+  }
+  const accepted = featureEvidenceGate && periodicityGate && compatibilityGate && coverageGate;
+  const status = accepted ? "MATCH_APPLIED" : "MATCH_UNCERTAIN";
+  const sourceScaleX = finiteOr(artSourceWidth, artWidth) / artWidth;
+  const sourceScaleY = finiteOr(artSourceHeight, artHeight) / artHeight;
+  const sourceEstimatedCardBox = scaleBox(estimatedCardBox, sourceScaleX, sourceScaleY);
+  const estimatedArtCardBox = {
+    workingPx: copyBox(estimatedCardBox),
+    sourcePx: sourceEstimatedCardBox,
+    normalized: {
+      working: normalizeBox(estimatedCardBox, artWidth, artHeight),
+      source: normalizeBox(sourceEstimatedCardBox, artSourceWidth, artSourceHeight),
+    },
+  };
+  const similarityDiagnostics = feature.similarity && {
+    ...feature.similarity,
+    residual: {
+      medianPx: feature.inliers?.medianResidualPx ?? null,
+      thresholdPx: feature.inliers?.thresholdPx ?? null,
+    },
+  };
+  const diagnostics = {
+    strategy: feature.strategy,
+    version: feature.version,
+    keypoints: feature.keypoints,
+    descriptors: feature.descriptors,
+    candidateMatches: feature.candidateMatches,
+    inliers: feature.inliers,
+    inlierRatio: feature.inliers?.ratio ?? 0,
+    similarity: similarityDiagnostics,
+    homography: feature.homography,
+    estimatedArtCardBox,
+    requiredTransform,
+    overscan,
+    compatibility: {
+      ...(feature.compatibility || {}),
+      compatible: Boolean(compatibilityGate),
+      aspectMismatch,
+      rejectionReason: rejectionClassification,
+    },
+    rejectionClassification,
+    confidenceGates: {
+      ...(feature.confidenceGates || {}),
+      periodicity: periodicityGate,
+      compatibility: Boolean(compatibilityGate),
+      coverage: coverageGate,
+      passed: accepted,
+    },
+  };
+  const evidence = featureEvidenceItems({
+    accepted,
+    rejectionClassification,
+    overscan,
+    repeatedPattern,
+  });
+  const reason = accepted
+    ? "Local feature correspondence passed deterministic RANSAC, renderer compatibility, and coverage gates."
+    : rejectionClassification === "INSUFFICIENT_OVERSCAN"
+      ? overscanReason(overscan)
+      : rejectionClassification === "ROTATION_BEYOND_RENDERER_CONTRACT"
+        ? "Card artwork was found with rotation beyond the renderer's zoom-and-translation tolerance."
+        : ["PERSPECTIVE_BEYOND_RENDERER_CONTRACT", "AFFINE_BEYOND_RENDERER_CONTRACT", "ASPECT_RATIO_BEYOND_RENDERER_CONTRACT"].includes(rejectionClassification)
+          ? "Card artwork was found, but its geometric distortion is incompatible with the zoom-and-translation renderer."
+          : repeatedPattern
+            ? "The reference texture is too periodic for a unique automatic local-feature match."
+            : "Local feature evidence did not clear the automatic apply gates.";
+  return {
+    matcherVersion: MATCHER_VERSION,
+    configVersion: matcherConfig.version || MATCHER_CONFIG_VERSION,
+    strategy: feature.strategy,
+    status,
+    legacyStatus: accepted ? "MATCHED" : "NO_RELIABLE_MATCH",
+    accepted,
+    autoApplied: accepted,
+    zoom: accepted ? requiredTransform.zoom : baselineTransform.zoom,
+    offsetX: accepted ? requiredTransform.offsetX : baselineTransform.offsetX,
+    offsetY: accepted ? requiredTransform.offsetY : baselineTransform.offsetY,
+    requiredTransform,
+    bestScore: null,
+    secondScore: null,
+    scoreMargin: null,
+    candidateCount: feature.candidateMatches?.crossCheckedCount || 0,
+    validCandidateCount: feature.inliers?.count || 0,
+    estimatedCardBox: estimatedArtCardBox,
+    similarity: similarityDiagnostics,
+    periodicityScore: periodicity,
+    repeatedPattern,
+    coverage,
+    coverageDiagnostics: coverage,
+    overscan,
+    compatibility: diagnostics.compatibility,
+    rejectionClassification,
+    diagnostics,
+    evidence,
+    reason,
+    elapsedMs: feature.elapsedMs,
+    gates: {
+      ...MATCH_GATES,
+      localFeatures: featureEvidenceGate,
+      periodicity: periodicityGate,
+      compatibility: Boolean(compatibilityGate),
+      coverage: coverageGate,
+      passed: accepted,
+    },
+  };
+}
+
+function featurePeriodicity(card, cardWidth, cardHeight) {
+  if (!card || !cardWidth || !cardHeight) return 0;
+  const targetHeight = Math.max(36, Math.min(140, Math.round(cardHeight)));
+  const targetWidth = Math.max(28, Math.round(targetHeight * cardWidth / cardHeight));
+  const resized = resizeGray(card, cardWidth, cardHeight, targetWidth, targetHeight);
+  return periodicityScore(resized, targetWidth, targetHeight);
+}
+
+// The v4 path deliberately tries local correspondence first. Correlation is
+// still retained for weak feature evidence and legacy small synthetic inputs;
+// it is never allowed to overwrite a strong feature finding that fails only
+// because the renderer cannot cover the selected output.
+export function searchTransforms(input = {}) {
+  const matcherConfig = mergeConfig(input.config || MATCHER_CONFIG);
+  const localFeatures = matchLocalFeatures({
+    art: input.art,
+    artWidth: input.artWidth,
+    artHeight: input.artHeight,
+    card: input.card,
+    cardWidth: input.cardWidth,
+    cardHeight: input.cardHeight,
+    config: matcherConfig.features,
+    shouldCancel: input.shouldCancel || input.isCancelled,
+    onProgress: input.onProgress,
+  });
+  const periodicity = featurePeriodicity(input.card, input.cardWidth, input.cardHeight);
+  const localResult = featureResult({
+    ...input,
+    matcherConfig,
+    periodicity,
+    feature: localFeatures,
+  });
+  if (localResult) {
+    input.onProgress?.({ stage: "Preparing match result", completedWork: 1, totalWork: 1, progress: 100 });
+    return localResult;
+  }
+  const fallback = searchCorrelationTransforms({
+    ...input,
+    config: matcherConfig,
+    onProgress: (event = {}) => input.onProgress?.({
+      ...event,
+      progress: 65 + Math.max(0, Math.min(100, finiteOr(event.progress, 0))) * 0.35,
+    }),
+  });
+  return {
+    ...fallback,
+    matcherVersion: MATCHER_VERSION,
+    configVersion: matcherConfig.version || MATCHER_CONFIG_VERSION,
+    strategy: "correlation-fallback",
+    autoApplied: Boolean(fallback.accepted),
+    featureDiagnostics: localFeatures,
+    diagnostics: {
+      strategy: "correlation-fallback",
+      version: matcherConfig.version || MATCHER_CONFIG_VERSION,
+      localFeatures,
+    },
   };
 }

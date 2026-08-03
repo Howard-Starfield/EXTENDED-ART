@@ -1,4 +1,4 @@
-const VERSION = "alignment-v3.0";
+const VERSION = "alignment-v4.0";
 
 export const MATCHER_CONFIG_VERSION = VERSION;
 
@@ -47,6 +47,44 @@ export const MATCHER_CONFIG = Object.freeze({
     minimumScore: 0.78,
     minimumMargin: 0.06,
     maximumPeriodicity: 0.995,
+  }),
+  features: Object.freeze({
+    strategy: "local-features-ransac",
+    version: VERSION,
+    // Feature work is intentionally capped independently from the worker's
+    // raster cap. This keeps the browser-local matcher responsive without a
+    // model download or a server round-trip.
+    maximumDimension: 900,
+    minimumInputDimension: 120,
+    pyramidScales: Object.freeze([1, 0.76, 0.58]),
+    roiGrid: Object.freeze({ columns: 4, rows: 5 }),
+    maxKeypointsPerLevel: 180,
+    maxKeypointsPerRoi: 14,
+    minimumKeypoints: 24,
+    descriptorBits: 128,
+    descriptorRadius: 12,
+    harrisThresholdFraction: 0.004,
+    nonMaximumRadius: 2,
+    minimumKeypointDistance: 6,
+    ratioThreshold: 0.78,
+    maximumDescriptorDistance: 58,
+    minimumCandidateMatches: 12,
+    ransacIterations: 640,
+    homographyIterations: 420,
+    inlierThresholdPx: 4.5,
+    minimumInliers: 10,
+    minimumInlierRatio: 0.26,
+    minimumRois: 3,
+    minimumRows: 2,
+    minimumColumns: 2,
+    minimumSpreadX: 0.18,
+    minimumSpreadY: 0.16,
+    maximumRotationDegrees: 2,
+    maximumScaleMismatch: 0.035,
+    maximumPerspectiveDistortion: 0.045,
+    maximumAffineDistortion: 0.055,
+    maximumModelScale: 4,
+    minimumModelScale: 0.2,
   }),
   coverage: Object.freeze({
     // The small guard band is reported as evidence. The normal cover-fit
