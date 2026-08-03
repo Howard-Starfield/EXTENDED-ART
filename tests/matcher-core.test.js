@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  MATCHER_CONFIG,
   MATCH_GATES,
   correlation,
   coverGeometry,
+  coverageDiagnostics,
   coversMaster,
   periodicityScore,
   searchTransforms,
@@ -46,6 +48,13 @@ describe("deterministic reference matcher", () => {
   it("keeps the bounded transform geometry inside the master", () => {
     expect(coversMaster(240, 220, 100, 120, { zoom: 1.1, offsetX: -0.05, offsetY: 0.05 })).toBe(true);
     expect(coversMaster(240, 220, 100, 120, { zoom: 1, offsetX: 0.2, offsetY: 0 })).toBe(false);
+    const exact = coverageDiagnostics(100, 120, 100, 120, { zoom: 1, offsetX: 0, offsetY: 0 });
+    const uncovered = coverageDiagnostics(100, 120, 100, 120, { zoom: 1, offsetX: 0.01, offsetY: 0 });
+    expect(MATCHER_CONFIG.borderExclusion).toBeCloseTo(0.03, 6);
+    expect(exact.covered).toBe(true);
+    expect(exact.requiredOverscanPx).toBe(2);
+    expect(uncovered.covered).toBe(false);
+    expect(uncovered.edgeClearancePx.left).toBeLessThan(0);
   });
 
   it("produces a normalized Sobel plane and perfect correlation for identical data", () => {
@@ -85,8 +94,14 @@ describe("deterministic reference matcher", () => {
       comparisonHeight: 60,
     });
     expect(result.accepted).toBe(true);
-    expect(result.status).toBe("MATCHED");
+    expect(result.status).toBe("MATCH_APPLIED");
+    expect(result.legacyStatus).toBe("MATCHED");
     expect(result.bestScore).toBeGreaterThanOrEqual(MATCH_GATES.minimumScore);
+    expect(result.regionScores).toHaveLength(9);
+    expect(result.regionSupport).toHaveLength(9);
+    expect(result.supportedRegionCount).toBeGreaterThanOrEqual(5);
+    expect(result.comparisonLevels).toHaveLength(3);
+    expect(result.gates.passed).toBe(true);
     expect(result.zoom).toBeCloseTo(transform.zoom, 2);
     expect(result.offsetX).toBeCloseTo(transform.offsetX, 2);
     expect(result.offsetY).toBeCloseTo(transform.offsetY, 2);
@@ -109,6 +124,8 @@ describe("deterministic reference matcher", () => {
     });
 
     expect(result.accepted).toBe(false);
-    expect(result.status).toBe("NO_RELIABLE_MATCH");
+    expect(result.status).toBe("MATCH_UNCERTAIN");
+    expect(result.legacyStatus).toBe("NO_RELIABLE_MATCH");
+    expect(result.reason).toContain("aggregate score");
   });
 });

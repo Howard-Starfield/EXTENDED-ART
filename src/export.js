@@ -11,7 +11,7 @@ import {
 import { createCutReadyPdf, createFullArtPdf, createPrintGuidePdf, createWithCardReferencePdf } from "./pdf-export.js";
 import { buildPrintPackage, estimatePeakMemory } from "./package.js";
 import { safeSlug, outputNames } from "./names.js";
-import { buildQualityReport } from "./quality-report.js";
+import { buildQualityReport, serializeAlignmentDiagnostics } from "./quality-report.js";
 import { imageSize } from "./state.js";
 import { withPrintMetadata } from "./png.js";
 
@@ -92,6 +92,10 @@ function printInstructions({ profile, papers, layouts, options, memory }) {
 }
 
 function sourceManifest(state, profile, paper, alignment, options, layout, papers, layouts) {
+  const serializedAlignment = serializeAlignmentDiagnostics(alignment, {
+    currentTransform: { zoom: state.zoom, offsetX: state.offsetX, offsetY: state.offsetY },
+    preservedAlignment: Boolean(state.lastStableAlignment),
+  });
   return {
     appVersion: "0.1.0",
     profile: profile.name,
@@ -99,12 +103,9 @@ function sourceManifest(state, profile, paper, alignment, options, layout, paper
     paper: paper.name,
     paperSizeMm: [...paper.size_mm],
     paperSet: papers.map((item) => ({ name: item.name, label: item.label, sizeMm: [...item.size_mm] })),
-    alignment: alignment ? {
-      status: alignment.status,
-      accepted: Boolean(alignment.accepted),
-      matcherVersion: alignment.matcherVersion || null,
-      profileVersion: alignment.profileVersion || profile.version || null,
-      scoreMargin: alignment.scoreMargin ?? null,
+    alignment: serializedAlignment ? {
+      ...serializedAlignment,
+      profileVersion: alignment?.profileVersion || profile.version || null,
     } : null,
     exportOptions: options,
     source: {
@@ -225,6 +226,8 @@ export async function createBrowserPrintPackage({
     exportOptions: options,
     papers: outputPaperSet,
     layouts,
+    currentTransform: { zoom: state.zoom, offsetX: state.offsetX, offsetY: state.offsetY },
+    preservedAlignment: Boolean(state.lastStableAlignment),
   });
   const manifest = sourceManifest(state, profile, paper, state.matcherDiagnostics, options, layout, outputPaperSet, layouts);
   const result = await buildPrintPackage({

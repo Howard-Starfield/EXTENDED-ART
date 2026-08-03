@@ -15,13 +15,14 @@ function makeCard({ contrast = 190, repeated = false } = {}) {
     for (let x = 0; x < CARD_WIDTH; x += 1) {
       const sourceX = repeated ? x % 12 : x;
       const sourceY = repeated ? y % 12 : y;
-      card[y * CARD_WIDTH + x] = 120 + (((sourceX * 17 + sourceY * 29 + (sourceX * sourceY) % 41) % 190) / 190) * contrast - contrast / 2;
+      const texture = ((sourceX * 17 + sourceY * 29 + (sourceX * sourceY) % 41) % 190);
+      card[y * CARD_WIDTH + x] = 120 + (texture / 190) * contrast - contrast / 2;
     }
   }
   return card;
 }
 
-function makeScene(card, transform, { noCard = false, repeated = false } = {}) {
+function makeScene(card, transform, { noCard = false, repeated = false, borderOverlay = false, semanticMismatch = false } = {}) {
   const scene = new Float32Array(SCENE_WIDTH * SCENE_HEIGHT);
   for (let y = 0; y < SCENE_HEIGHT; y += 1) {
     for (let x = 0; x < SCENE_WIDTH; x += 1) {
@@ -32,6 +33,9 @@ function makeScene(card, transform, { noCard = false, repeated = false } = {}) {
   }
   if (noCard) return scene;
   const geometry = coverGeometry(SCENE_WIDTH, SCENE_HEIGHT, MASTER_WIDTH, MASTER_HEIGHT, transform);
+  const sceneCard = semanticMismatch ? makeCard({ contrast: 190 }).map((value, index) => (
+    120 + ((((index % CARD_WIDTH) * 31 + Math.floor(index / CARD_WIDTH) * 7 + index % 23) % 190) / 190) * 190 - 95
+  )) : card;
   const cardLeft = CARD_BOX[0] * MASTER_WIDTH;
   const cardTop = CARD_BOX[1] * MASTER_HEIGHT;
   const cardOutputWidth = (CARD_BOX[2] - CARD_BOX[0]) * MASTER_WIDTH;
@@ -43,7 +47,12 @@ function makeScene(card, transform, { noCard = false, repeated = false } = {}) {
       if (outputX < cardLeft || outputX > cardLeft + cardOutputWidth || outputY < cardTop || outputY > cardTop + cardOutputHeight) continue;
       const cardX = Math.min(CARD_WIDTH - 1, Math.max(0, Math.round((outputX - cardLeft) / cardOutputWidth * CARD_WIDTH - 0.5)));
       const cardY = Math.min(CARD_HEIGHT - 1, Math.max(0, Math.round((outputY - cardTop) / cardOutputHeight * CARD_HEIGHT - 0.5)));
-      scene[sourceY * SCENE_WIDTH + sourceX] = card[cardY * CARD_WIDTH + cardX];
+      const relativeX = (outputX - cardLeft) / cardOutputWidth;
+      const relativeY = (outputY - cardTop) / cardOutputHeight;
+      const isBorder = relativeX < 0.02 || relativeX >= 0.98 || relativeY < 0.02 || relativeY >= 0.98;
+      scene[sourceY * SCENE_WIDTH + sourceX] = borderOverlay && isBorder
+        ? ((sourceX + sourceY) % 2 ? 250 : 5)
+        : sceneCard[cardY * CARD_WIDTH + cardX];
     }
   }
   return scene;
@@ -73,8 +82,8 @@ describe("reference matcher fixture release gates", () => {
     ];
     const errors = fixtures.map((fixture) => {
       const card = makeCard({ contrast: fixture.contrast });
-      const result = runFixture(card, makeScene(card, fixture.transform));
-      expect(result.accepted, fixture.name).toBe(true);
+      const result = runFixture(card, makeScene(card, fixture.transform, fixture));
+      expect(result.accepted, `${fixture.name}: ${result.reason}; score=${result.bestScore}; support=${result.supportFraction}`).toBe(true);
       const transformError = Math.max(
         Math.abs(result.zoom - fixture.transform.zoom),
         Math.abs(result.offsetX - fixture.transform.offsetX),
@@ -96,6 +105,26 @@ describe("reference matcher fixture release gates", () => {
     expect(Math.max(...errors)).toBeLessThanOrEqual(10);
   });
 
+  it("ignores a deterministic UI/border overlay outside the 3% scoring inset", () => {
+    const sceneCard = makeCard();
+    const overlaidReference = Float32Array.from(sceneCard);
+    for (let y = 0; y < CARD_HEIGHT; y += 1) {
+      for (let x = 0; x < CARD_WIDTH; x += 1) {
+        if (x === 0 || x === CARD_WIDTH - 1 || y === 0 || y === CARD_HEIGHT - 1) {
+          overlaidReference[y * CARD_WIDTH + x] = (x + y) % 2 ? 250 : 5;
+        }
+      }
+    }
+    const result = runFixture(
+      overlaidReference,
+      makeScene(sceneCard, { zoom: 1.1, offsetX: 0, offsetY: 0 }),
+    );
+
+    expect(result.accepted, `${result.reason}; score=${result.bestScore}; margin=${result.scoreMargin}; support=${result.supportFraction}`).toBe(true);
+    expect(result.supportedRegionCount).toBeGreaterThanOrEqual(5);
+    expect(result.gates.regions).toBe(true);
+  });
+
   it("rejects no-card and repeated-pattern negative fixtures", () => {
     const card = makeCard();
     const noCard = runFixture(card, makeScene(card, { zoom: 1, offsetX: 0, offsetY: 0 }, { noCard: true }));
@@ -104,5 +133,18 @@ describe("reference matcher fixture release gates", () => {
 
     expect(noCard.accepted).toBe(false);
     expect(repeated.accepted).toBe(false);
+  });
+
+  it("rejects a semantically different card even when the chamber geometry is correct", () => {
+    const card = makeCard();
+    const result = runFixture(
+      card,
+      makeScene(card, { zoom: 1.1, offsetX: 0, offsetY: 0 }, { semanticMismatch: true }),
+    );
+
+    expect(result.accepted).toBe(false);
+    expect(result.status).toBe("MATCH_UNCERTAIN");
+    expect(result.legacyStatus).toBe("NO_RELIABLE_MATCH");
+    expect(result.crossRegionSupport).toBe(false);
   });
 });
