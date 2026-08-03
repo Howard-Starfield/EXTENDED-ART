@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { TextWriter, Uint8ArrayReader, Uint8ArrayWriter, ZipReader } from "@zip.js/zip.js";
+import { PDFDocument } from "pdf-lib";
 import { readFileSync } from "node:fs";
 import { deflateSync } from "node:zlib";
 
@@ -79,10 +80,16 @@ test("auto-aligns after both required images decode", async ({ page }) => {
   const cardImage = solidPng(630, 880);
 
   await page.locator("label.mode-card").first().click();
-  await page.getByRole("button", { name: "Continue to sheet" }).click();
   await page.locator("label.paper-card").first().click();
   await page.getByRole("button", { name: "Open alignment studio" }).click();
   await expect(page.locator("#autoAlignButton")).toBeDisabled();
+  await expect(page.locator("#paperContract")).toHaveText("A4 / 210 × 297 mm");
+  await expect(page.locator("#a4Fit")).toContainText("mm");
+  await expect(page.locator("#letterFit")).toContainText("mm");
+  const a4Icon = await page.locator(".a4-icon").boundingBox();
+  const letterIcon = await page.locator(".letter-icon").boundingBox();
+  expect(a4Icon.width / a4Icon.height).toBeCloseTo(210 / 297, 2);
+  expect(letterIcon.width / letterIcon.height).toBeCloseTo(215.9 / 279.4, 2);
 
   await page.setInputFiles("#artInput", {
     name: "synthetic-3x3-scene.png",
@@ -103,6 +110,25 @@ test("auto-aligns after both required images decode", async ({ page }) => {
   await page.locator("#letterPaperTool").click({ force: true });
   await page.locator("#includeCard").click({ force: true });
   await page.locator("#includePieces").click({ force: true });
+  await expect(page.locator("#alignmentProgress")).toBeHidden({ timeout: 15_000 });
+  await expect(page.locator("#autoAlignStatus")).toHaveAttribute("data-alignment-status", "MATCH_UNCERTAIN");
+  await page.locator("#canvasShell").focus();
+  await page.locator("#canvasShell").press("ArrowRight");
+  await expect(page.locator("#offsetValue")).toHaveText("X 1 / Y 0");
+  const retryProgress = page.locator("#alignmentProgress").waitFor({ state: "visible" });
+  await page.locator("#autoAlignButton").click();
+  await retryProgress;
+  await page.locator("#cancelAlignmentButton").click();
+  await expect(page.locator("#alignmentProgress")).toBeHidden();
+  await expect(page.locator("#autoAlignStatus")).toHaveAttribute("data-alignment-status", "CANCELLED");
+  await expect(page.locator("#offsetValue")).toHaveText("X 1 / Y 0");
+
+  await page.locator("#autoAlignButton").click();
+  await expect(page.locator("#alignmentProgress")).toBeHidden({ timeout: 5000 });
+  await expect(page.locator("#autoAlignStatus")).toHaveAttribute("data-alignment-status", "MATCH_UNCERTAIN");
+  await expect(page.locator("#offsetValue")).toHaveText("X 1 / Y 0");
+
+  const completedJob = await page.locator("#progressJob").textContent();
   await expect(page.locator("#gridToggle")).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator("#letterPaperTool")).toHaveAttribute("aria-pressed", "false");
   await expect(page.locator("#includeCard")).not.toBeChecked();
@@ -114,19 +140,24 @@ test("auto-aligns after both required images decode", async ({ page }) => {
   await expect(page.locator("#progressBar")).toHaveCSS("width", "100%");
     await expect(page.locator("#autoAlignStatus")).toHaveAttribute(
       "data-alignment-status",
-      "NO_RELIABLE_MATCH",
+      "MATCH_UNCERTAIN",
     );
-    await expect(page.locator("#autoAlignStatus")).toContainText("No reliable automatic match");
+  await expect(page.locator("#autoAlignStatus")).toContainText("inconclusive");
   await expect(page.locator("#includeCard")).not.toBeChecked();
+  await page.locator("#letterPaperTool").click({ force: true });
+  await expect(page.locator("#paperContract")).toHaveText("US Letter / 215.9 × 279.4 mm");
+  await expect(page.locator("#progressJob")).toHaveText(completedJob);
+  await page.locator("#a4PaperTool").click({ force: true });
+  await expect(page.locator("#paperContract")).toHaveText("A4 / 210 × 297 mm");
 
   await page.locator("#canvasShell").focus();
   await page.locator("#canvasShell").press("ArrowRight");
-  await expect(page.locator("#offsetValue")).toHaveText("X 1 / Y 0");
+  await expect(page.locator("#offsetValue")).toHaveText("X 2 / Y 0");
   await page.locator("#canvasShell").dispatchEvent("keydown", {
     key: "ArrowLeft",
     shiftKey: true,
   });
-  await expect(page.locator("#offsetValue")).toHaveText("X -9 / Y 0");
+  await expect(page.locator("#offsetValue")).toHaveText("X -8 / Y 0");
   const canvasBox = await page.locator("#canvasShell").boundingBox();
   await page.mouse.move(canvasBox.x + canvasBox.width / 2, canvasBox.y + canvasBox.height / 2);
   await page.mouse.down();
@@ -186,6 +217,14 @@ test("auto-aligns after both required images decode", async ({ page }) => {
   expect(optionalNames).toContain("synthetic_3x3_scene_standard_letter_print_guide.pdf");
   expect(optionalNames).toContain("synthetic_3x3_scene_standard_letter_full_art_reference.pdf");
   expect(optionalNames).toContain("synthetic_3x3_scene_standard_letter_with_card_reference.pdf");
+  const a4CutReady = optionalEntries.find((entry) => entry.filename === "synthetic_3x3_scene_standard_a4_cut_ready.pdf");
+  const letterCutReady = optionalEntries.find((entry) => entry.filename === "synthetic_3x3_scene_standard_letter_cut_ready.pdf");
+  const a4Page = (await PDFDocument.load(await a4CutReady.getData(new Uint8ArrayWriter()))).getPages()[0].getMediaBox();
+  const letterPage = (await PDFDocument.load(await letterCutReady.getData(new Uint8ArrayWriter()))).getPages()[0].getMediaBox();
+  expect(a4Page.width).toBeCloseTo(595.2755905, 5);
+  expect(a4Page.height).toBeCloseTo(841.8897638, 5);
+  expect(letterPage.width).toBeCloseTo(612, 5);
+  expect(letterPage.height).toBeCloseTo(792, 5);
   const manifestEntry = optionalEntries.find((entry) => entry.filename === "manifest.json");
   const manifest = JSON.parse(await manifestEntry.getData(new TextWriter()));
   expect(manifest.paperSet.map((item) => item.name)).toEqual(["a4", "letter"]);
@@ -206,4 +245,34 @@ test("auto-aligns after both required images decode", async ({ page }) => {
   expect(pieceBytes.readUInt32BE(16)).toBe(744);
   expect(pieceBytes.readUInt32BE(20)).toBe(1039);
   await optionalReader.close();
+});
+
+test("uses the typed-pixel matcher fallback without bitmap worker APIs", async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(window, "createImageBitmap", { configurable: true, value: undefined });
+    Object.defineProperty(window, "OffscreenCanvas", { configurable: true, value: undefined });
+  });
+  await page.goto("/");
+  await page.locator("label.mode-card").first().click();
+  await page.locator("label.paper-card").first().click();
+  await page.getByRole("button", { name: "Open alignment studio" }).click();
+
+  await page.setInputFiles("#artInput", {
+    name: "fallback-scene.png",
+    mimeType: "image/png",
+    buffer: syntheticGridPng(1000, 880),
+  });
+  const progressVisible = page.locator("#alignmentProgress").waitFor({ state: "visible" });
+  await page.setInputFiles("#cardInput", {
+    name: "fallback-card.png",
+    mimeType: "image/png",
+    buffer: solidPng(630, 880),
+  });
+  await progressVisible;
+  await expect(page.locator("#alignmentProgress")).toBeHidden({ timeout: 15_000 });
+  await expect(page.locator("#autoAlignStatus")).toHaveAttribute(
+    "data-alignment-status",
+    "MATCH_UNCERTAIN",
+  );
+  await expect(page.locator("#autoAlignStatus")).not.toContainText("cannot prepare pixels");
 });

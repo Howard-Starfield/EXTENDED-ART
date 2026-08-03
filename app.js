@@ -4,15 +4,23 @@ import {
   fallbackPapers,
   fallbackProfiles,
   PROFILE_VERSION,
-  paperFit,
   pixelPair,
   profileSummary,
   psaLabelBox as makePsaLabelBox,
 } from "./src/profiles.js";
-import { createInitialState, imageSize, releaseImage } from "./src/state.js";
+import { createPageLayout } from "./src/page-layout.js";
+import {
+  ALIGNMENT_STATUSES,
+  alignmentTransform,
+  createInitialState,
+  imageSize,
+  normalizeAlignmentResult,
+  releaseImage,
+  snapshotAlignment,
+} from "./src/state.js";
 import { fileSummary, readImage, replacePreviewUrl } from "./src/image-io.js";
 import { classifyEffectiveDpi } from "./src/quality.js";
-import { buildQualityReport } from "./src/quality-report.js";
+import { alignmentEvidence, buildQualityReport, sanitizeDiagnosticText } from "./src/quality-report.js";
 import { CENTER_FIT_ALIGNMENT } from "./src/alignment.js";
 import { createMatcherJobRunner } from "./src/matcher.js";
 import { drawAlignmentScene, drawArtworkProof } from "./src/renderer.js";
@@ -28,6 +36,9 @@ let toastTimer;
 let renderQueued = false;
 let exportController = null;
 const intakeGeneration = { art: 0, card: 0 };
+const intakeDecodedGeneration = { art: 0, card: 0 };
+let suppressMatcherLifecycle = false;
+let activeAlignmentContext = null;
 
 function activeProfile() {
   return state.profiles[state.profile] || fallbackProfiles.standard;
@@ -66,12 +77,13 @@ function setRuler(element, total, divisions, suffix) {
 function updateSetupSummary() {
   const profileName = document.querySelector('input[name="profile"]:checked')?.value || state.profile;
   const paperName = document.querySelector('input[name="paper"]:checked')?.value || state.paper;
-  const profile = state.profiles[profileName] || fallbackProfiles[profileName];
-  const paper = state.papers[paperName] || fallbackPapers[paperName];
+  const profile = state.profiles[profileName] || fallbackProfiles[profileName] || fallbackProfiles.standard;
+  const paper = state.papers[paperName] || fallbackPapers[paperName] || fallbackPapers.a4;
   if (!(profile && paper)) return;
   $("#setupSummaryName").textContent = profile.label;
   $("#setupSummaryPixels").textContent = `${pixelPair(profile.master_px)} px`;
   $("#setupSummarySize").textContent = `${cleanMeasure(profile.master_mm[0])} × ${cleanMeasure(profile.master_mm[1])} mm`;
+  $("#setupSummarySheet").textContent = `${paper.label} / ${cleanMeasure(paper.size_mm[0])} × ${cleanMeasure(paper.size_mm[1])} mm`;
   $("#setupSummaryPackage").textContent = profileSummary(profile, paper);
 }
 
@@ -98,17 +110,21 @@ function updatePaperTools() {
     ["letter", "#letterPaperTool", "#letterFit"],
   ].forEach(([paperName, buttonSelector, fitSelector]) => {
     const paper = state.papers[paperName] || fallbackPapers[paperName];
-    const fit = paperFit(profile, paperName, state.papers);
+    const layout = createPageLayout(profile, paper);
     const selected = state.paper === paperName;
-    const percent = fit.scale < 0.9995 ? `${(fit.scale * 100).toFixed(1)}%` : "100%";
-    const dimensions = paper.size_mm.map(cleanMeasure).join("×");
+    const outputLabel = layout.pageCount > 1
+      ? `${layout.pageCount} pages · exact size`
+      : layout.warnings.length
+        ? "Exact size · margin note"
+        : "Exact size";
+    const dimensions = `${paper.size_mm.map(cleanMeasure).join(" × ")} mm`;
     const button = $(buttonSelector);
     button.classList.toggle("active", selected);
-    button.classList.toggle("scaled", fit.scale < 0.9995);
+    button.classList.toggle("scaled", layout.pageCount > 1 || layout.warnings.length > 0);
     button.setAttribute("aria-pressed", String(selected));
-    button.setAttribute("aria-label", `${paper.label} ${dimensions} millimetres, output at ${percent}`);
-    button.title = `${paper.label}: ${dimensions} mm | output ${percent}`;
-    $(fitSelector).textContent = `${dimensions} · ${percent}`;
+    button.setAttribute("aria-label", `${paper.label} ${dimensions} millimetres, ${outputLabel}`);
+    button.title = `${paper.label}: ${dimensions} mm | ${outputLabel}`;
+    $(fitSelector).textContent = `${dimensions} · ${outputLabel}`;
   });
 }
 
@@ -118,13 +134,7 @@ function updateSetupWizard() {
   $("#setupPaperStep").hidden = productStep;
   $("#setupStepLabel").textContent = productStep ? "Step 1 of 2" : "Step 2 of 2";
   $("#launchTitle").textContent = productStep ? "What are we making today?" : "Choose your paper size";
-  const description = $("#launchTitle").parentElement.querySelector("p:last-child");
-  description.textContent = productStep
-    ? "Choose the physical object first. Every crop, guide and export will follow it."
-    : "Pick the first sheet for this package. You can add the other paper size during final export.";
-  const selectedProduct = document.querySelector('input[name="profile"]:checked');
   const selectedPaper = document.querySelector('input[name="paper"]:checked');
-  $("#continueSetupButton").disabled = !selectedProduct;
   $("#startStudioButton").disabled = !selectedPaper;
 }
 
@@ -154,7 +164,7 @@ function updateStudioContract() {
   $("#masterContract").textContent = pixelPair(profile.master_px);
   $("#pieceContractLabel").textContent = profile.piece_count === 1 ? "Output" : "Insert";
   $("#pieceContract").textContent = pixelPair(profile.insert_px);
-  $("#paperContract").textContent = `${paper.label} / 300 DPI`;
+  $("#paperContract").textContent = `${paper.label} / ${paper.size_mm.map(cleanMeasure).join(" × ")} mm`;
   $("#includeCardHelp").textContent = "Off by default to save ink; the cut-ready package leaves the center/card chamber empty.";
   $("#cutReadyOutputHelp").textContent = profile.name === "psa"
     ? "White PSA label + card chambers with dotted guides"
@@ -167,14 +177,13 @@ function updateStudioContract() {
 }
 
 function focusVisibleSetupControl() {
-  const control = state.setupStep === "product"
-    ? document.querySelector('input[name="profile"]:checked')
-    : document.querySelector('input[name="paper"]:checked');
+  const selector = state.setupStep === "product" ? 'input[name="profile"]' : 'input[name="paper"]';
+  const control = document.querySelector(`${selector}:checked`) || document.querySelector(selector);
   window.setTimeout(() => control?.focus(), 0);
 }
 
 function openSetup() {
-  state.setupStep = "product";
+  state.setupStep = state.profile ? "paper" : "product";
   const gate = $("#launchGate");
   document.querySelectorAll('input[name="profile"], input[name="paper"]').forEach((input) => {
     input.checked = input.name === "profile" ? input.value === state.profile : input.value === state.paper;
@@ -208,26 +217,26 @@ function applySetup(event) {
     state.cornerRadiusMm = Number(activeProfile().recommended_corner_radius_mm || 0);
     $("#radiusRange").value = String(state.cornerRadiusMm);
     $("#radiusValue").textContent = `${cleanMeasure(state.cornerRadiusMm)} mm`;
-    resetAlignment(false);
+    state.lastStableAlignment = null;
+    state.alignmentSnapshot = null;
+    applyCenterFit();
     $("#autoAlignStatus").hidden = true;
   }
   updateStudioContract();
   closeSetup();
   $("#changeSetupButton").focus();
-  if (state.artImage && state.cardImage) startAlignment("setup changed");
+  if (profileChanged && state.artImage && state.cardImage) startAlignment("profile changed");
 }
 
 document.querySelectorAll('input[name="profile"], input[name="paper"]').forEach((input) => {
   input.addEventListener("change", () => {
+    if (input.name === "profile" && state.setupStep === "product") {
+      state.setupStep = "paper";
+    }
     updateSetupSummary();
     updateSetupWizard();
+    if (input.name === "profile") focusVisibleSetupControl();
   });
-});
-$("#continueSetupButton").addEventListener("click", () => {
-  state.setupStep = "paper";
-  updateSetupSummary();
-  updateSetupWizard();
-  focusVisibleSetupControl();
 });
 $("#backSetupButton").addEventListener("click", () => {
   state.setupStep = "product";
@@ -284,28 +293,55 @@ function updateAutoAlignAvailability() {
   button.disabled = state.alignmentBusy || !(state.artFile && state.cardFile) || Boolean(state.cardQuality?.blocksAlignment);
 }
 
+function syncAlignmentControls() {
+  $("#zoomRange").value = String(Math.round(state.zoom * 100));
+  $("#zoomValue").textContent = `${Math.round(state.zoom * 100)}%`;
+}
+
+function currentAlignmentSnapshot(metadata = {}) {
+  return snapshotAlignment({
+    zoom: state.zoom,
+    offsetX: state.offsetX,
+    offsetY: state.offsetY,
+  }, metadata);
+}
+
+function rememberStableAlignment(method = "user-corrected") {
+  state.lastStableAlignment = currentAlignmentSnapshot({ method, status: state.alignmentStatus });
+  return state.lastStableAlignment;
+}
+
+function restoreAlignment(snapshot) {
+  if (!snapshot) return;
+  const transform = alignmentTransform(snapshot);
+  state.zoom = transform.zoom;
+  state.offsetX = transform.offsetX;
+  state.offsetY = transform.offsetY;
+  syncAlignmentControls();
+  requestRender();
+}
+
 function applyCenterFit() {
-  state.baseline = { ...CENTER_FIT_ALIGNMENT, method: "center-fit" };
+  state.baseline = { ...CENTER_FIT_ALIGNMENT, status: "CENTERED_NOT_MATCHED", method: "center-fit" };
   state.zoom = state.baseline.zoom;
   state.offsetX = state.baseline.offsetX;
   state.offsetY = state.baseline.offsetY;
-  $("#zoomRange").value = "100";
-  $("#zoomValue").textContent = "100%";
+  syncAlignmentControls();
 }
 
 function applyReferenceTransform(result) {
+  const source = result?.transform && typeof result.transform === "object" ? result.transform : result;
+  if (![source?.zoom, source?.offsetX ?? source?.offset_x, source?.offsetY ?? source?.offset_y]
+    .every((value) => Number.isFinite(Number(value)))) return false;
+  const transform = alignmentTransform(result);
   state.baseline = {
-    zoom: result.zoom,
-    offsetX: result.offsetX,
-    offsetY: result.offsetY,
+    ...transform,
     status: result.status,
     method: "reference-match",
   };
-  state.zoom = result.zoom;
-  state.offsetX = result.offsetX;
-  state.offsetY = result.offsetY;
-  $("#zoomRange").value = String(Math.round(result.zoom * 100));
-  $("#zoomValue").textContent = `${Math.round(result.zoom * 100)}%`;
+  restoreAlignment(transform);
+  state.lastStableAlignment = { ...transform, status: result.status, method: "reference-match" };
+  return true;
 }
 
 function updateQualityReport(alignment = state.matcherDiagnostics) {
@@ -319,6 +355,8 @@ function updateQualityReport(alignment = state.matcherDiagnostics) {
     alignment,
     labelBox: profile.name === "psa" ? currentPsaLabelBox() : null,
     cornerRadiusMm: state.cornerRadiusMm,
+    currentTransform: currentAlignmentSnapshot(),
+    preservedAlignment: Boolean(state.lastStableAlignment),
     exportOptions: {
       includeCard: includeCardRequested(),
       includePieces: $("#includePieces").checked,
@@ -359,65 +397,98 @@ function showAlignmentProgress({ jobId, label, progress }) {
   $("#progressBar").style.width = `${roundedProgress}%`;
 }
 
-function finishAlignmentCancel(message = "Alignment cancelled. Upload both images or run it again when ready.") {
+function alignmentUserMessage(result) {
+  const status = result?.status;
+  const evidence = alignmentEvidence(result).join(" ");
+  const evidenceText = evidence ? ` Evidence: ${evidence}` : "";
+  const reason = sanitizeDiagnosticText(result?.reason);
+  if (status === ALIGNMENT_STATUSES.APPLIED) {
+    return `Reference match applied.${evidenceText} Inspect the card edges and fine-tune if needed.`;
+  }
+  if (status === ALIGNMENT_STATUSES.UNCERTAIN) {
+    return `Automatic reference matching was inconclusive.${evidenceText} Manual correction is required; the current alignment was kept.`;
+  }
+  if (status === ALIGNMENT_STATUSES.TIMED_OUT) {
+    return `Reference matching timed out.${reason ? ` ${reason}.` : ""} The current alignment was kept; retry or continue manually.`;
+  }
+  if (status === ALIGNMENT_STATUSES.CANCELLED) {
+    return "Alignment cancelled. The current alignment was kept; retry or continue manually.";
+  }
+  return `Reference matching failed.${reason ? ` ${reason}.` : ""} The current alignment was kept; retry or continue manually.`;
+}
+
+function setAlignmentStatus(result, { toast = true } = {}) {
+  state.alignmentStatus = result.status;
+  state.matcherDiagnostics = result;
+  updateQualityReport(result);
+  const status = $("#autoAlignStatus");
+  status.dataset.alignmentStatus = result.status;
+  status.textContent = alignmentUserMessage(result);
+  status.classList.toggle("low", result.status !== ALIGNMENT_STATUSES.APPLIED);
+  status.hidden = false;
+  if (toast) {
+    showToast(result.status === ALIGNMENT_STATUSES.APPLIED
+      ? "Reference match applied."
+      : result.status === ALIGNMENT_STATUSES.UNCERTAIN
+        ? "Automatic match was inconclusive; current alignment retained."
+        : alignmentUserMessage(result));
+  }
+}
+
+function finishAlignmentCancel(details = {}) {
   if (!state.alignmentBusy) return;
+  restoreAlignment(state.alignmentSnapshot);
   state.alignmentRequestId += 1;
   state.alignmentBusy = false;
-  state.alignmentStatus = "CANCELLED";
-  $("#autoAlignStatus").dataset.alignmentStatus = "CANCELLED";
+  state.alignmentRestartPending = false;
+  state.alignmentJobId = details.jobId || state.alignmentJobId;
+  activeAlignmentContext = null;
+  const result = normalizeAlignmentResult({
+    ...details,
+    status: ALIGNMENT_STATUSES.CANCELLED,
+    accepted: false,
+    reason: details.reason || "Cancellation requested by caller.",
+    preservedAlignment: Boolean(state.lastStableAlignment),
+  });
+  setAlignmentStatus(result);
   $("#autoAlignButton").classList.remove("is-loading");
   setProgressVisible(false);
   updateAutoAlignAvailability();
-  $("#autoAlignStatus").textContent = message;
-  $("#autoAlignStatus").classList.add("low");
-  $("#autoAlignStatus").hidden = false;
   window.setTimeout(() => $("#autoAlignButton").focus(), 0);
 }
 
 function finishAlignmentError(error, jobId = 0) {
   if (jobId && state.alignmentJobId && jobId !== state.alignmentJobId) return;
+  if (jobId && activeAlignmentContext?.jobId && jobId !== activeAlignmentContext.jobId) return;
+  if (!state.alignmentBusy) return;
+  restoreAlignment(state.alignmentSnapshot);
+  const candidateStatus = error?.status || error?.resultStatus || error?.result_status
+    || (/timed?\s*out|timeout/i.test(error?.message || "") ? ALIGNMENT_STATUSES.TIMED_OUT : ALIGNMENT_STATUSES.FAILED);
+  const knownStatus = [ALIGNMENT_STATUSES.TIMED_OUT, ALIGNMENT_STATUSES.FAILED, ALIGNMENT_STATUSES.CANCELLED]
+    .includes(candidateStatus) ? candidateStatus : ALIGNMENT_STATUSES.FAILED;
+  if (knownStatus === ALIGNMENT_STATUSES.CANCELLED) {
+    finishAlignmentCancel({ jobId, reason: error?.reason });
+    return;
+  }
   state.alignmentBusy = false;
-  state.alignmentStatus = "ERROR";
-  $("#autoAlignStatus").dataset.alignmentStatus = "ERROR";
-  $("#autoAlignButton").classList.remove("is-loading");
-  setProgressVisible(false);
-  updateAutoAlignAvailability();
-  $("#autoAlignStatus").textContent = `Alignment failed: ${error.message || "try again when both images are ready."}`;
-  $("#autoAlignStatus").classList.add("low");
-  $("#autoAlignStatus").hidden = false;
-  showToast(error.message || "Alignment could not be completed.");
-}
-
-const matcherRunner = createMatcherJobRunner({
-  onProgress: (event) => {
-    if (event.jobId !== state.alignmentJobId) return;
-    showAlignmentProgress(event);
-  },
-  onComplete: (result) => {
-    if (result.jobId !== state.alignmentJobId) return;
-    state.alignmentBusy = false;
-    state.lastCompletedJobId = result.jobId;
-    state.alignmentStatus = result.status;
-    state.matcherDiagnostics = result;
-    updateQualityReport(result);
-    $("#autoAlignStatus").dataset.alignmentStatus = result.status;
-    $("#autoAlignButton").classList.remove("is-loading");
-    if (result.accepted) applyReferenceTransform(result);
-    else if (!state.baseline) applyCenterFit();
-    setProgressVisible(false);
-    $("#autoAlignStatus").textContent = result.accepted
-      ? "Reference match applied - inspect the card edges and fine-tune if needed."
-      : "No reliable automatic match - inspect and align manually.";
-    $("#autoAlignStatus").classList.toggle("low", !result.accepted);
-    $("#autoAlignStatus").hidden = false;
-    $("#proofButton").disabled = false;
+  state.alignmentRequestId += 1;
+  state.alignmentRestartPending = false;
+  state.alignmentJobId = jobId || state.alignmentJobId;
+  activeAlignmentContext = null;
+  const result = normalizeAlignmentResult({
+    status: knownStatus,
+    accepted: false,
+    jobId: jobId || state.alignmentJobId,
+  …500 tokens truncated…bled = ![ALIGNMENT_STATUSES.APPLIED, ALIGNMENT_STATUSES.UNCERTAIN]
+      .includes(normalized.status);
     updateAutoAlignAvailability();
     updateExportSummary();
     requestRender();
     window.setTimeout(() => $("#proofButton").focus(), 0);
-    showToast(result.accepted ? "Reference match applied." : "No reliable match; center-fit baseline retained.");
   },
-  onCancel: () => finishAlignmentCancel(),
+  onCancel: (details) => {
+    if (!suppressMatcherLifecycle) finishAlignmentCancel(details);
+  },
   onError: finishAlignmentError,
 });
 
@@ -428,23 +499,97 @@ $("#alignmentProgress").addEventListener("keydown", (event) => {
 });
 
 async function cloneForMatcher(image) {
-  if (typeof createImageBitmap !== "function") {
-    throw new Error("This browser cannot run local reference matching. You can still align the scene manually.");
+  if (typeof createImageBitmap === "function" && typeof OffscreenCanvas !== "undefined") {
+    return createImageBitmap(image);
   }
-  return createImageBitmap(image);
+  const { width: sourceWidth, height: sourceHeight } = imageSize(image);
+  if (!sourceWidth || !sourceHeight) {
+    throw new Error("This browser could not read the image dimensions for local matching.");
+  }
+  const scale = Math.min(1, 1200 / Math.max(sourceWidth, sourceHeight));
+  const width = Math.max(1, Math.round(sourceWidth * scale));
+  const height = Math.max(1, Math.round(sourceHeight * scale));
+  const fallbackCanvas = document.createElement("canvas");
+  fallbackCanvas.width = width;
+  fallbackCanvas.height = height;
+  const fallbackContext = fallbackCanvas.getContext("2d", { alpha: false, colorSpace: "srgb" })
+    || fallbackCanvas.getContext("2d", { alpha: false });
+  if (!fallbackContext) {
+    throw new Error("This browser cannot prepare pixels for local reference matching. You can still align manually.");
+  }
+  fallbackContext.drawImage(image, 0, 0, width, height);
+  return {
+    width,
+    height,
+    pixelFormat: "rgba",
+    data: fallbackContext.getImageData(0, 0, width, height).data,
+  };
+}
+
+function generationsReady(generations = { art: intakeGeneration.art, card: intakeGeneration.card }) {
+  return Boolean(state.artImage && state.cardImage)
+    && intakeDecodedGeneration.art === generations.art
+    && intakeDecodedGeneration.card === generations.card
+    && intakeGeneration.art === generations.art
+    && intakeGeneration.card === generations.card;
+}
+
+function cancelMatcherForTransition(reason) {
+  state.alignmentRequestId += 1;
+  const previous = suppressMatcherLifecycle;
+  suppressMatcherLifecycle = true;
+  try {
+    matcherRunner.cancel(reason);
+  } finally {
+    suppressMatcherLifecycle = previous;
+  }
+  state.alignmentJobId = 0;
+  activeAlignmentContext = null;
+}
+
+function queueAlignmentRestart(reason) {
+  if (!state.alignmentBusy) return;
+  state.alignmentRestartPending = true;
+  state.alignmentRestartReason = reason;
+  state.alignmentStatus = "RUNNING";
+  cancelMatcherForTransition(reason);
+  showAlignmentProgress({ jobId: 0, label: `Waiting for ${reason}`, progress: 0 });
+}
+
+function maybeStartAlignment(reason = "both images ready") {
+  const generations = { art: intakeGeneration.art, card: intakeGeneration.card };
+  if (!(state.artImage && state.cardImage) || state.cardQuality?.blocksAlignment) return;
+  if (!generationsReady(generations)) return;
+  if (state.alignmentBusy) {
+    if (state.alignmentRestartPending) {
+      state.alignmentRestartPending = false;
+      startAlignment(state.alignmentRestartReason || reason);
+    }
+    return;
+  }
+  startAlignment(reason);
 }
 
 async function startAlignment(reason = "both images ready") {
   if (!(state.artFile && state.cardFile) || state.cardQuality?.blocksAlignment) return;
-  if (state.alignmentBusy) matcherRunner.cancel();
+  if (state.alignmentBusy) cancelMatcherForTransition("A newer alignment request replaced this one.");
   const requestId = state.alignmentRequestId + 1;
   state.alignmentRequestId = requestId;
+  const generations = { art: intakeGeneration.art, card: intakeGeneration.card };
+  const preserved = currentAlignmentSnapshot({
+    method: state.lastStableAlignment?.method || "user-corrected",
+    status: state.alignmentStatus,
+  });
+  state.alignmentSnapshot = preserved;
+  if (!state.baseline) state.baseline = { ...preserved, status: "CENTERED_NOT_MATCHED", method: "center-fit" };
   state.alignmentBusy = true;
   state.alignmentStatus = "RUNNING";
   state.matcherDiagnostics = null;
   state.qualityReport = null;
   state.alignmentJobId = 0;
-  applyCenterFit();
+  state.alignmentSourceGenerations = generations;
+  state.alignmentRestartPending = false;
+  activeAlignmentContext = { requestId, generations, preserved, jobId: 0 };
   $("#autoAlignStatus").hidden = true;
   $("#autoAlignButton").classList.add("is-loading");
   updateAutoAlignAvailability();
@@ -457,7 +602,7 @@ async function startAlignment(reason = "both images ready") {
       cloneForMatcher(state.artImage),
       cloneForMatcher(state.cardImage),
     ]);
-    if (!state.alignmentBusy || requestId !== state.alignmentRequestId) {
+    if (!state.alignmentBusy || requestId !== state.alignmentRequestId || !generationsReady(generations)) {
       releaseImage(matchArt);
       releaseImage(matchCard);
       return;
@@ -466,10 +611,16 @@ async function startAlignment(reason = "both images ready") {
       artImage: matchArt,
       cardImage: matchCard,
       profile: activeProfile(),
-      baseline: state.baseline,
+      baseline: preserved,
       profileVersion: PROFILE_VERSION,
     });
+    if (!state.alignmentBusy || requestId !== state.alignmentRequestId) {
+      releaseImage(matchArt);
+      releaseImage(matchCard);
+      return;
+    }
     state.alignmentJobId = jobId;
+    if (activeAlignmentContext) activeAlignmentContext.jobId = jobId;
     showAlignmentProgress({ jobId, label: "Starting reference matcher", progress: 0 });
   } catch (error) {
     releaseImage(matchArt);
@@ -497,7 +648,8 @@ function setPreview(kind, file) {
 }
 
 async function loadFile(kind, file) {
-  if (state.alignmentBusy) return;
+  if (!file || state.exportBusy) return;
+  if (state.alignmentBusy) queueAlignmentRestart(`${kind} replacement`);
   const generation = ++intakeGeneration[kind];
   try {
     const decoded = await readImage(file, kind);
@@ -511,8 +663,8 @@ async function loadFile(kind, file) {
     state[`${kind}Image`] = decoded.image;
     state[`${kind}Quality`] = decoded;
     state[`${kind}Dimensions`] = { width: decoded.width, height: decoded.height };
+    intakeDecodedGeneration[kind] = generation;
     state.lastCompletedJobId = 0;
-    state.baseline = null;
     state.matcherDiagnostics = null;
     state.qualityReport = null;
     setPreview(kind, file);
@@ -520,7 +672,6 @@ async function loadFile(kind, file) {
     $(`#${kind}Drop`).classList.add("loaded");
     if (kind === "art") {
       $("#emptyState").hidden = true;
-      resetAlignment(false);
     }
     state.alignmentStatus = "NEEDS_REFERENCE";
     $("#proofButton").disabled = true;
@@ -529,17 +680,29 @@ async function loadFile(kind, file) {
     updateAutoAlignAvailability();
     updateExportSummary();
     requestRender();
-    if (state.artImage && state.cardImage) {
-      if (state.cardQuality?.blocksAlignment) {
+    if (state.cardQuality?.blocksAlignment) {
+      if (state.alignmentBusy) {
+        finishAlignmentError({
+          status: ALIGNMENT_STATUSES.FAILED,
+          reason: state.cardQuality.blockingIssues.join(" "),
+        });
+      } else {
         $("#autoAlignStatus").textContent = state.cardQuality.blockingIssues.join(" ");
         $("#autoAlignStatus").classList.add("low");
         $("#autoAlignStatus").hidden = false;
-      } else {
-        startAlignment("both images ready");
       }
+    } else {
+      maybeStartAlignment("both images ready");
     }
   } catch (error) {
-    showToast(error.message);
+    if (generation === intakeGeneration[kind] && state.alignmentBusy) {
+      finishAlignmentError({
+        status: ALIGNMENT_STATUSES.FAILED,
+        reason: `The ${kind} image could not be decoded; the current alignment was kept.`,
+      });
+    } else {
+      showToast(sanitizeDiagnosticText(error?.message) || "The image could not be decoded.");
+    }
   }
 }
 
@@ -593,14 +756,10 @@ function render() {
   $("#offsetValue").textContent = `X ${xPixels} / Y ${yPixels}`;
 }
 
-function resetAlignment(announce = true) {
+function resetAlignment(announce = true, remember = true) {
   const baseline = state.baseline || CENTER_FIT_ALIGNMENT;
-  state.zoom = baseline.zoom;
-  state.offsetX = baseline.offsetX;
-  state.offsetY = baseline.offsetY;
-  $("#zoomRange").value = "100";
-  $("#zoomValue").textContent = "100%";
-  requestRender();
+  restoreAlignment(baseline);
+  if (remember) rememberStableAlignment("user-corrected");
   if (announce) showToast("Artwork fit to the full page.");
 }
 
@@ -618,6 +777,7 @@ shell.addEventListener("pointermove", (event) => {
   state.offsetY += (event.clientY - state.pointerY) / rect.height;
   state.pointerX = event.clientX;
   state.pointerY = event.clientY;
+  rememberStableAlignment("user-corrected");
   requestRender();
 });
 ["pointerup", "pointercancel"].forEach((eventName) => {
@@ -631,6 +791,7 @@ shell.addEventListener("wheel", (event) => {
   const percent = Math.round(state.zoom * 100);
   $("#zoomRange").value = String(percent);
   $("#zoomValue").textContent = `${percent}%`;
+  rememberStableAlignment("user-corrected");
   requestRender();
 }, { passive: false });
 
@@ -639,6 +800,7 @@ function nudge(dx, dy, amount = 1) {
   const profile = activeProfile();
   state.offsetX += (dx * amount) / profile.master_px[0];
   state.offsetY += (dy * amount) / profile.master_px[1];
+  rememberStableAlignment("user-corrected");
   requestRender();
 }
 
@@ -661,6 +823,7 @@ $("#zoomRange").addEventListener("input", (event) => {
   if (state.alignmentBusy) return;
   state.zoom = Number(event.target.value) / 100;
   $("#zoomValue").textContent = `${event.target.value}%`;
+  rememberStableAlignment("user-corrected");
   requestRender();
 });
 $("#opacityRange").addEventListener("input", (event) => {
@@ -709,6 +872,7 @@ function choosePaper(paperName) {
   if (setupChoice) setupChoice.checked = true;
   updateSetupSummary();
   updateStudioContract();
+  if (state.matcherDiagnostics) updateQualityReport();
 }
 $("#a4PaperTool").addEventListener("click", () => choosePaper("a4"));
 $("#letterPaperTool").addEventListener("click", () => choosePaper("letter"));
@@ -717,6 +881,7 @@ $("#includeCard").addEventListener("change", (event) => {
     event.currentTarget.checked = false;
     return;
   }
+  if (state.matcherDiagnostics) updateQualityReport();
   requestRender();
 });
 $("#exitAppButton").addEventListener("click", () => {
