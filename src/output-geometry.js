@@ -1,3 +1,5 @@
+import { isSlabProfile } from "./profiles.js";
+
 export const GUIDE_CLEARANCE_PT = 0.25;
 export const GUIDE_STROKE_PT = 0.5;
 
@@ -49,7 +51,7 @@ export function getCutoutGeometry(
   if (profile.name === "psa" && labelBox) {
     cutouts.push({ id: "PSA_LABEL", label: "PSA LABEL CUTOUT", box: labelBox, radiusMm: cornerRadiusMm });
   }
-  if (profile.name === "psa") {
+  if (isSlabProfile(profile)) {
     cutouts.push({ id: "CARD", label: "CARD CUTOUT", box: profile.card_box, radiusMm: cornerRadiusMm });
   } else if (profile.name === "photo8x10") {
     cutouts.push({ id: "CARD", label: "CARD CHAMBER", box: profile.card_box, radiusMm: cornerRadiusMm });

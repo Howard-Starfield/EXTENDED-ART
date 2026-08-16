@@ -64,7 +64,7 @@ decisions visible and measurable before a customer wastes paper or ink.
 - Guides must be visibly outside the finished artwork.
 - A4 and US Letter must be real, distinct page sizes in both preview and
   export.
-- The four audited profiles must remain stable before arbitrary templates are
+- The five audited profiles must remain stable before arbitrary templates are
   added.
 - Runtime code, fonts, icons, PDF code, and ZIP code must be served from the
   site itself. The core workflow must not depend on a third-party CDN.
@@ -80,7 +80,7 @@ decisions visible and measurable before a customer wastes paper or ink.
 ## 2. Recommended user journey
 
 1. Launch the site. The first setup screen asks what the user wants to create:
-   Standard 3x3 Binder, Vault Binder, PSA Slab, or 8x10 Photo Frame.
+   Standard 3x3 Binder, Vault Binder, PSA Slab, Card Slab, or 8x10 Photo Frame.
 2. Advance to a separate paper step and choose exactly one primary paper: A4
    or US Letter. A Back action returns to the product step without losing the
    choice. The setup screen shows the actual profile dimensions, expected
@@ -125,7 +125,7 @@ need to understand the internal image pipeline to complete a print.
 | Alignment start | Automatic after both images decode | Removes the extra button press and makes the workflow predictable |
 | Alignment lock | Blocking progress overlay while matching | Prevents edits from racing the renderer and corrupting the scene state |
 | Card overlay in alignment preview | On after the card loads | Lets the user inspect edge continuity; this is preview state only |
-| Printed center card | Off | Binder cut-ready output contains eight outer inserts; PSA and frame output retain a blank card chamber |
+| Printed center card | Off | Binder cut-ready output contains eight outer inserts; slab and frame output retain a blank card chamber |
 | With-card reference PDF | Off; optional separate PDF | Provides a same-size visual reference without replacing or modifying the cut-ready PDF; never include the raw uploaded card file |
 | Cut-ready PDF | Always included | It is the primary customer deliverable |
 | Optional pieces | Off | Prevents a pieces folder from appearing when the customer did not request it |

@@ -70,7 +70,7 @@ describe("deterministic output pieces", () => {
   });
 
   it("returns one complete printable piece for non-binder profiles", () => {
-    for (const name of ["psa", "photo8x10"]) {
+    for (const name of ["psa", "cardslab", "photo8x10"]) {
       const pieces = getPrintablePieceGeometry(fallbackProfiles[name]);
       expect(pieces).toHaveLength(1);
       expect(pieces[0].id).toBe("R1C1");

@@ -37,3 +37,19 @@ test("keeps a narrow laptop viewport free of persistent horizontal overflow", as
   await page.goto("/");
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
 });
+
+test("offers a label-free Card Slab with a centered-card package contract", async ({ page }) => {
+  await page.goto("/");
+  const cardSlab = page.locator("label.mode-card").filter({ hasText: "Card Slab" });
+  await expect(cardSlab).toHaveCount(1);
+  await cardSlab.click();
+  await expect(page.getByRole("heading", { name: "Choose your paper size" })).toBeVisible();
+  await expect(page.locator("#setupSummaryName")).toHaveText("Card Slab");
+  await expect(page.locator("#setupSummaryPackage")).toContainText("centered card");
+  await page.locator("label.paper-card").first().click();
+  await page.getByRole("button", { name: "Open alignment studio" }).click();
+  await expect(page.locator("#activeSpec")).toContainText("Card Slab");
+  await expect(page.locator("#frameModeBadge")).toHaveText("card slab · centered card");
+  await expect(page.locator("#psaLabelControls")).toBeHidden();
+  await expect(page.locator("#cutReadyOutputHelp")).toHaveText("White centered card chamber with dotted guide");
+});

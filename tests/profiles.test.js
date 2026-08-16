@@ -28,6 +28,17 @@ describe("print profile contracts", () => {
     expect((box[3] - box[1]) * 135.128).toBeCloseTo(21.59, 8);
   });
 
+  it("centers a standard card in the label-free PSA-sized Card Slab", () => {
+    const profile = fallbackProfiles.cardslab;
+    expect(profile.master_mm).toEqual(fallbackProfiles.psa.master_mm);
+    expect(profile.master_px).toEqual(fallbackProfiles.psa.master_px);
+    expect(profile.label_box).toBeNull();
+    expect(cardPhysicalMm(profile)[0]).toBeCloseTo(63, 8);
+    expect(cardPhysicalMm(profile)[1]).toBeCloseTo(88, 8);
+    expect(profile.card_box[1] * profile.master_mm[1]).toBeCloseTo((135.128 - 88) / 2, 8);
+    expect(profile.card_box[3] * profile.master_mm[1]).toBeCloseTo((135.128 + 88) / 2, 8);
+  });
+
   it("shows when Vault Letter needs exact two-page handling", () => {
     const fit = paperFit(fallbackProfiles.vaultx, "letter", fallbackPapers);
     expect(fit.scale).toBeLessThan(1);

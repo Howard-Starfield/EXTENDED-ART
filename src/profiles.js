@@ -44,6 +44,21 @@ export const fallbackProfiles = {
     label_box_mm: [5.207, 5, 69.85, 21.59],
     recommended_corner_radius_mm: 3,
   },
+  cardslab: {
+    name: "cardslab",
+    version: PROFILE_VERSION,
+    label: "Card Slab",
+    grid: [1, 1],
+    piece_count: 1,
+    insert_mm: [80.264, 135.128],
+    insert_px: [948, 1596],
+    master_mm: [80.264, 135.128],
+    master_px: [948, 1596],
+    // The standard 63 × 88 mm card is centered in the full PSA-sized slab.
+    card_box: [8.632 / 80.264, 23.564 / 135.128, 71.632 / 80.264, 111.564 / 135.128],
+    label_box: null,
+    recommended_corner_radius_mm: 3,
+  },
   photo8x10: {
     name: "photo8x10",
     version: PROFILE_VERSION,
@@ -71,6 +86,14 @@ export function cleanMeasure(value) {
 
 export function pixelPair(values) {
   return values[0] + " × " + values[1];
+}
+
+export function isSlabProfile(profile) {
+  return profile?.name === "psa" || profile?.name === "cardslab";
+}
+
+export function isSingleDisplayProfile(profile) {
+  return isSlabProfile(profile) || profile?.name === "photo8x10";
 }
 
 export function psaLabelBox(profile, widthMm, heightMm) {
@@ -109,7 +132,7 @@ export function paperFit(profile, paperName, papers = fallbackPapers) {
 
 export function profileSummary(profile, paper) {
   const unit = profile.piece_count === 1
-    ? (profile.name === "photo8x10" ? "print" : "insert")
+    ? (profile.name === "photo8x10" ? "print" : profile.name === "cardslab" ? "centered card" : "insert")
     : "printed inserts + center card";
   const quantity = profile.piece_count > 1 ? "8" : "1";
   return `${quantity} ${unit} + ${paper.label} PDF`;

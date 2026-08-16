@@ -23,6 +23,16 @@ describe("cutout and guide geometry", () => {
     expect(geometry[1].pixels.height).toBe(1039);
   });
 
+  it("returns only the centered card opening for the label-free Card Slab", () => {
+    const profile = fallbackProfiles.cardslab;
+    const geometry = getOutputMaskGeometry(profile);
+
+    expect(geometry.map((item) => item.id)).toEqual(["CARD"]);
+    expect(geometry[0].pixels.width).toBe(744);
+    expect(geometry[0].pixels.height).toBe(1039);
+    expect(geometry[0].pixels.y).toBe(Math.round((23.564 / 25.4) * 300));
+  });
+
   it("keeps custom PSA label dimensions physically exact", () => {
     const profile = fallbackProfiles.psa;
     const geometry = getOutputMaskGeometry(profile, {
@@ -46,6 +56,7 @@ describe("cutout and guide geometry", () => {
     expect(psa.map((item) => item.radiusMm)).toEqual([4.5, 4.5]);
     expect(getOutputMaskGeometry(fallbackProfiles.photo8x10)[0].radiusMm).toBe(0);
     expect(getOutputMaskGeometry(fallbackProfiles.photo8x10, { cornerRadiusMm: 5 })[0].radiusMm).toBe(5);
+    expect(getOutputMaskGeometry(fallbackProfiles.cardslab, { cornerRadiusMm: 4.5 })[0].radiusMm).toBe(4.5);
   });
 
   it("keeps outer guides outside and internal guides inside their retained boundaries", () => {

@@ -1,5 +1,6 @@
 import { imageSize } from "./state.js";
 import { getCutoutGeometry, internalGuideRect, normalizedBoxToPixels } from "./output-geometry.js";
+import { isSingleDisplayProfile } from "./profiles.js";
 
 export function roundedRectPath(context, x, y, width, height, radius) {
   const r = Math.max(0, Math.min(radius, width / 2, height / 2));
@@ -69,7 +70,7 @@ export function drawAlignmentScene({ context, width, height, profile, state, art
     drawCardReference(context, cardImage, profile.card_box, width, height, cardRadius, state.opacity, state.difference);
   }
 
-  if (artImage && (profile.name === "psa" || profile.name === "photo8x10")) {
+  if (artImage && isSingleDisplayProfile(profile)) {
     const cutouts = getCutoutGeometry(profile, {
       labelBox,
       cornerRadiusMm: state.cornerRadiusMm,

@@ -3,6 +3,7 @@ import {
   cardPhysicalMm,
   fallbackPapers,
   fallbackProfiles,
+  isSlabProfile,
   PROFILE_VERSION,
   pixelPair,
   profileSummary,
@@ -144,7 +145,15 @@ function updateStudioContract() {
   const isBinder = profile.grid[0] > 1;
   shell.style.aspectRatio = `${profile.master_px[0]} / ${profile.master_px[1]}`;
   shell.classList.toggle("photo-frame-mode", profile.name === "photo8x10");
-  $("#frameModeBadge").hidden = profile.name !== "photo8x10";
+  shell.classList.toggle("slab-mode", isSlabProfile(profile));
+  const modeBadge = $("#frameModeBadge");
+  const badgeText = profile.name === "photo8x10"
+    ? "8 × 10 frame preview"
+    : profile.name === "cardslab"
+      ? "card slab · centered card"
+      : "";
+  modeBadge.textContent = badgeText;
+  modeBadge.hidden = !badgeText;
   $(".light-table").dataset.paper = state.paper;
   $("#activeSpec").textContent = `${profile.label} | ${pixelPair(profile.master_px)} px | ${paper.label} | 300 DPI`;
   $("#artDropTitle").textContent = isBinder
@@ -168,7 +177,9 @@ function updateStudioContract() {
   $("#includeCardHelp").textContent = "Off by default to save ink; the cut-ready package leaves the center/card chamber empty.";
   $("#cutReadyOutputHelp").textContent = profile.name === "psa"
     ? "White PSA label + card chambers with dotted guides"
-    : "Finished outer pieces with cut guides";
+    : profile.name === "cardslab"
+      ? "White centered card chamber with dotted guide"
+      : "Finished outer pieces with cut guides";
   $("#psaLabelControls").hidden = profile.name !== "psa";
   updatePaperTools();
   updateExportSummary();

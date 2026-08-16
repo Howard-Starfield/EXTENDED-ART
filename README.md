@@ -17,7 +17,7 @@ This project is intentionally isolated from `ExtendedArt_Offline_Workflow`. The 
 
 The first public workflow should process images in the visitor's browser whenever possible:
 
-1. Choose Standard, Vault, PSA, or 8x10, then choose A4 or US Letter.
+1. Choose Standard, Vault, PSA, Card Slab, or 8x10, then choose A4 or US Letter.
 2. Upload extended artwork and the required original card.
 3. Let browser-local alignment start automatically, then fine-tune it.
 4. Preview the exact-size cut-ready layout.
