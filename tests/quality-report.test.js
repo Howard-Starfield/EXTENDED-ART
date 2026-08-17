@@ -86,6 +86,22 @@ describe("quality report contract", () => {
     expect(report.alignment.transform).toEqual({ zoom: 1.04, offsetX: 0.01, offsetY: -0.02 });
   });
 
+  it("keeps export available when automatic alignment fails without a preserved match", () => {
+    const report = buildQualityReport({
+      profile: fallbackProfiles.standard,
+      paper: fallbackPapers.a4,
+      artDimensions: { width: 2232, height: 3118 },
+      cardDimensions: { width: 744, height: 1039 },
+      alignment: {
+        status: "FAILED",
+        reason: "The local matcher could not find enough evidence.",
+      },
+    });
+
+    expect(report.overallStatus).toBe("PASS_WITH_WARNINGS");
+    expect(report.warnings.some((warning) => warning.includes("center-fit baseline remains available"))).toBe(true);
+  });
+
   it("serializes v4 feature and overscan diagnostics without raw local input details", () => {
     const serialized = serializeAlignmentDiagnostics({
       status: "MATCH_UNCERTAIN",

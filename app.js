@@ -101,7 +101,7 @@ function updateExportSummary() {
     : "Cut-ready PDF + print guide included";
   $("#exportButton").disabled = state.alignmentBusy
     || state.exportBusy
-    || !(state.artImage && state.cardImage && state.lastCompletedJobId);
+    || !(state.artImage && state.cardImage);
 }
 
 function updatePaperTools() {
@@ -965,7 +965,7 @@ $("#exitAppButton").addEventListener("click", () => {
 });
 $("#exportButton").addEventListener("click", async () => {
   if (state.alignmentBusy || state.exportBusy) return;
-  if (!(state.artImage && state.cardImage && state.lastCompletedJobId)) return;
+  if (!(state.artImage && state.cardImage)) return;
   if (state.qualityReport?.overallStatus === "BLOCKED") {
     showToast("Resolve the blocked source-quality warning before exporting.");
     return;

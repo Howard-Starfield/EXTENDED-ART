@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   CARD_RATIO,
+  cardCropRect,
   MAX_DECODED_PIXELS,
   MAX_DIMENSION,
   MAX_UPLOAD_BYTES,
@@ -37,12 +38,15 @@ describe("image intake and quality limits", () => {
     expect(() => validateDecodedImage("art", { width: MAX_DIMENSION + 1, height: 1 })).toThrow("16,384");
   });
 
-  it("blocks reference matching for a card that is not within five percent of 63:88", () => {
+  it("keeps padded card references usable and provides a safe center crop", () => {
     const valid = validateDecodedImage("card", { width: 630, height: 880 });
     expect(valid.blocksAlignment).toBe(false);
     expect(valid.width / valid.height).toBeCloseTo(CARD_RATIO, 8);
     const invalid = validateDecodedImage("card", { width: 1000, height: 1000 });
-    expect(invalid.blocksAlignment).toBe(true);
+    expect(invalid.blocksAlignment).toBe(false);
+    expect(invalid.cropRect).toMatchObject({ x: 142, y: 0, width: 716, height: 1000 });
+    expect(invalid.warnings[0]).toContain("center-cropped");
+    expect(cardCropRect(1600, 900)).toBeNull();
   });
 
   it("classifies effective DPI without reading file metadata", () => {

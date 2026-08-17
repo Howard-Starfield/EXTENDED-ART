@@ -4,6 +4,8 @@ export const MAX_DIMENSION = 16_384;
 export const CARD_RECOMMENDED = { width: 630, height: 880 };
 export const CARD_MINIMUM = { width: 252, height: 352 };
 export const CARD_RATIO = 63 / 88;
+export const CARD_RATIO_TOLERANCE = 0.05;
+export const CARD_AUTO_CROP_MAX_REMOVED_FRACTION = 0.4;
 
 const MIME_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
 const EXTENSION_TYPES = new Map([
@@ -45,6 +47,35 @@ export function decodedDimensions(image) {
   return { width: image?.naturalWidth || image?.width || 0, height: image?.naturalHeight || image?.height || 0 };
 }
 
+export function cardCropRect(width, height) {
+  const sourceWidth = Number(width);
+  const sourceHeight = Number(height);
+  if (!Number.isFinite(sourceWidth) || !Number.isFinite(sourceHeight) || sourceWidth <= 0 || sourceHeight <= 0) return null;
+
+  const ratio = sourceWidth / sourceHeight;
+  const ratioDelta = Math.abs(ratio - CARD_RATIO) / CARD_RATIO;
+  if (ratioDelta <= CARD_RATIO_TOLERANCE) return null;
+
+  const cropWidth = ratio > CARD_RATIO ? Math.round(sourceHeight * CARD_RATIO) : Math.round(sourceWidth);
+  const cropHeight = ratio > CARD_RATIO ? Math.round(sourceHeight) : Math.round(sourceWidth / CARD_RATIO);
+  const removedFraction = ratio > CARD_RATIO
+    ? (sourceWidth - cropWidth) / sourceWidth
+    : (sourceHeight - cropHeight) / sourceHeight;
+  if (removedFraction <= 0 || removedFraction > CARD_AUTO_CROP_MAX_REMOVED_FRACTION) return null;
+  if (cropWidth < CARD_MINIMUM.width || cropHeight < CARD_MINIMUM.height) return null;
+
+  return {
+    x: Math.floor((sourceWidth - cropWidth) / 2),
+    y: Math.floor((sourceHeight - cropHeight) / 2),
+    width: cropWidth,
+    height: cropHeight,
+    sourceWidth,
+    sourceHeight,
+    ratioDelta,
+    removedFraction,
+  };
+}
+
 export function validateDecodedImage(kind, image) {
   const { width, height } = decodedDimensions(image);
   if (!width || !height) throw new Error("This image has no readable dimensions.");
@@ -56,13 +87,15 @@ export function validateDecodedImage(kind, image) {
   }
   const warnings = [];
   const blockingIssues = [];
+  let cropRect = null;
   if (kind === "card") {
     const ratio = width / height;
-    const ratioDelta = Math.abs(ratio - CARD_RATIO) / CARD_RATIO;
-    if (ratioDelta > 0.05) {
-      const message = "Card ratio is outside the expected 63:88 shape; crop to the card edges before alignment.";
+    cropRect = cardCropRect(width, height);
+    if (Math.abs(ratio - CARD_RATIO) / CARD_RATIO > CARD_RATIO_TOLERANCE) {
+      const message = cropRect
+        ? "Card reference ratio is outside 63:88; the working reference will be center-cropped before alignment."
+        : "Card reference ratio is outside 63:88; no safe automatic crop was applied, so inspect the card edges before alignment.";
       warnings.push(message);
-      blockingIssues.push(message);
     }
     if (width < CARD_RECOMMENDED.width || height < CARD_RECOMMENDED.height) {
       warnings.push("Card reference is below the recommended 630 × 880 px quality target.");
@@ -71,7 +104,7 @@ export function validateDecodedImage(kind, image) {
       throw new Error("The original card must be at least 252 × 352 px.");
     }
   }
-  return { width, height, warnings, blockingIssues, blocksAlignment: blockingIssues.length > 0 };
+  return { width, height, warnings, blockingIssues, cropRect, blocksAlignment: blockingIssues.length > 0 };
 }
 
 export function effectiveDpi(pixelWidth, physicalMm) {

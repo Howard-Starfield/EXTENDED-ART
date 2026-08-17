@@ -440,12 +440,9 @@ export function buildQualityReport({
     const retained = Boolean(alignmentReport?.preservedAlignment);
     warnings.push(retained
       ? `Alignment ${normalizedAlignment.status.toLowerCase().replaceAll("_", " ")} did not replace the last accepted/manual alignment; retry or continue manually.`
-      : `Alignment ${normalizedAlignment.status.toLowerCase().replaceAll("_", " ")}; complete another alignment before export.`);
+      : `Alignment ${normalizedAlignment.status.toLowerCase().replaceAll("_", " ")}; the center-fit baseline remains available. Inspect and adjust manually before export.`);
   }
-  const transientStatus = [ALIGNMENT_STATUSES.FAILED, ALIGNMENT_STATUSES.TIMED_OUT, ALIGNMENT_STATUSES.CANCELLED]
-    .includes(normalizedAlignment?.status);
-  const blocked = Boolean(art?.blocksPackage || card?.blocksPackage)
-    || (transientStatus && !alignmentReport?.preservedAlignment);
+  const blocked = Boolean(art?.blocksPackage || card?.blocksPackage);
   return {
     reportVersion: QUALITY_REPORT_VERSION,
     profileVersion: profile.version || null,

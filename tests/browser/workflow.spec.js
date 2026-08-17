@@ -315,6 +315,33 @@ test("auto-aligns after both required images decode", async ({ page }) => {
   await optionalReader.close();
 });
 
+test("normalizes a padded card reference and keeps export available after an uncertain match", async ({ page }) => {
+  await page.goto("/");
+
+  await page.locator("label.mode-card").first().click();
+  await page.locator("label.paper-card").first().click();
+  await page.getByRole("button", { name: "Open alignment studio" }).click();
+
+  await page.setInputFiles("#artInput", {
+    name: "padded-scene.png",
+    mimeType: "image/png",
+    buffer: syntheticGridPng(1000, 880),
+  });
+  const progressVisible = page.locator("#alignmentProgress").waitFor({ state: "visible" });
+  await page.setInputFiles("#cardInput", {
+    name: "padded-card.png",
+    mimeType: "image/png",
+    buffer: solidPng(1000, 1000),
+  });
+  await progressVisible;
+  await expect(page.locator("#alignmentProgress")).toBeHidden({ timeout: 15_000 });
+
+  await expect(page.locator("#cardMeta")).toContainText("716 × 1000 px");
+  await expect(page.locator("#qualityNotice")).toContainText("automatically center-cropped");
+  await expect(page.locator("#qualityNotice")).not.toContainText("Card ratio is outside the expected");
+  await expect(page.locator("#exportButton")).toBeEnabled();
+});
+
 test("worker v4 auto-applies a translated and scaled local-feature match", async ({ page }) => {
   await page.goto("/");
   await page.locator("label.mode-card").first().click();
