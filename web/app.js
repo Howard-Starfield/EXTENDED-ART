@@ -388,7 +388,7 @@ function render() {
     ctx.drawImage(state.cardImage, cardX + (cardWBox-cardW)/2, cardY + (cardHBox-cardH)/2, cardW, cardH);
     ctx.restore();
   }
-  if (state.artImage && profile.name === "psa") {
+  if (state.artImage && (profile.name === "psa" || profile.name === "psaMini")) {
     const cutouts = [];
     if (profile.label_box) cutouts.push(["PSA LABEL CUTOUT", psaLabelBox(profile), 2]);
     if (!$("#includeCard").checked) cutouts.push(["CARD CUTOUT", profile.card_box, cardRadius]);
