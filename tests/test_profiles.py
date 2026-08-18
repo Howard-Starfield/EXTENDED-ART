@@ -36,6 +36,7 @@ class ProfileContractTests(unittest.TestCase):
             "standard": ((2232, 3118), (744, 1039), 9),
             "vaultx": ((2339, 3331), (780, 1110), 9),
             "psa": ((948, 1596), (948, 1596), 1),
+            "psaSlim": ((942, 1590), (942, 1590), 1),
             "photo8x10": ((2400, 3000), (2400, 3000), 1),
         }
         for name, contract in expected.items():
@@ -144,6 +145,58 @@ class ProfileContractTests(unittest.TestCase):
             self.assertTrue(pdf_names)
             self.assertTrue(all("letter" in name for name in pdf_names))
 
+
+    def test_psa_slim_centered_card_chamber_contract(self) -> None:
+        profile = PROFILES["psaSlim"]
+        self.assertEqual(profile.label, "PSA Cover Edition (Slim)")
+        # 3.14 x 5.30 in = 79.756 x 134.62 mm
+        self.assertAlmostEqual(profile.insert_w_mm, 79.756, places=5)
+        self.assertAlmostEqual(profile.insert_h_mm, 134.62, places=5)
+        self.assertEqual(profile.master_mm, (79.756, 134.62))
+        self.assertEqual(profile.master_px, (942, 1590))
+        self.assertEqual(profile.insert_px, (942, 1590))
+        self.assertIsNone(profile.label_box)
+        # Standard 63 x 88 mm card sits centered horizontally and vertically.
+        self.assertAlmostEqual(profile.card_box[0] * profile.insert_w_mm,
+                               (79.756 - 63.0) / 2, places=5)
+        self.assertAlmostEqual(profile.card_box[1] * profile.insert_h_mm,
+                               (134.62 - 88.0) / 2, places=5)
+
+    def test_psa_slim_cut_ready_package_uses_single_chamber(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source_path = root / "source.png"
+            Image.new("RGB", (600, 900), "teal").save(source_path)
+            result = build_package(
+                source_path,
+                root / "output",
+                options=BuildOptions(
+                    profile="psaSlim",
+                    paper_format="letter",
+                    cutout_card_zone=True,
+                ),
+            )
+            manifest = json.loads(Path(result["manifest"]).read_text(encoding="utf-8"))
+            profile_result = manifest["profiles"]["psaSlim"]
+            self.assertEqual([page["type"] for page in profile_result["pages"]], ["cut_ready"])
+            cutout_labels = {
+                cutout["label"] for cutout in profile_result["pages"][0]["cutouts"]
+            }
+            # Slim cover has no PSA label area — only the card chamber.
+            self.assertEqual(cutout_labels, {"card chamber"})
+            # No dotted guides (those are PSA-slab-specific in the current contract).
+            self.assertFalse(profile_result["pages"][0]["dotted_guides"])
+            # Card chamber is the centered 63 x 88 mm box.
+            cutouts = {
+                cutout["label"]: cutout["box_mm"]
+                for cutout in profile_result["pages"][0]["cutouts"]
+            }
+            self.assertEqual(cutouts["card chamber"], [
+                (79.756 - 63.0) / 2,
+                (134.62 - 88.0) / 2,
+                63.0,
+                88.0,
+            ])
 
     def test_psa_ink_saving_package_omits_optional_artifacts(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

@@ -23,11 +23,19 @@ from version import APP_VERSION
 
 DPI = 300
 MM_PER_INCH = 25.4
+TRIM_GUIDE_CLEARANCE_PT = 0.25
 PSA_OUTER_MM = (80.264, 135.128)
 PSA_LABEL_MM = (69.85, 21.59)
 PSA_LABEL_TOP_MM = 5.0
 PSA_CARD_MM = (63.0, 88.0)
 PSA_CARD_TOP_MM = 36.0
+# PSA Cover Edition (Slim) — same shape as the modern PSA holder envelope
+# but shaved ~0.51 mm off each axis so the artwork seats safely inside a
+# slim cover/case without binding the edges. Target 3.14" × 5.30".
+PSA_SLIM_OUTER_MM = (79.756, 134.62)
+PSA_SLIM_CARD_MM = (63.0, 88.0)
+# Card is centered vertically inside the slim cover (no PSA label area below).
+PSA_SLIM_CARD_TOP_MM = (PSA_SLIM_OUTER_MM[1] - PSA_SLIM_CARD_MM[1]) / 2
 
 
 @dataclass(frozen=True)
@@ -114,6 +122,12 @@ PSA_CARD_BOX = normalized_box_from_mm(
     PSA_CARD_TOP_MM,
     *PSA_CARD_MM,
 )
+PSA_SLIM_CARD_BOX = normalized_box_from_mm(
+    *PSA_SLIM_OUTER_MM,
+    (PSA_SLIM_OUTER_MM[0] - PSA_SLIM_CARD_MM[0]) / 2,
+    PSA_SLIM_CARD_TOP_MM,
+    *PSA_SLIM_CARD_MM,
+)
 
 
 def profile_for_options(profile: Profile, options: BuildOptions) -> Profile:
@@ -166,6 +180,17 @@ PROFILES = {
         PSA_CARD_BOX,
         "One extended-art insert sized to a modern PSA holder envelope.",
         PSA_LABEL_BOX,
+        3.0,
+    ),
+    "psaSlim": Profile(
+        "psaSlim",
+        "PSA Cover Edition (Slim)",
+        *PSA_SLIM_OUTER_MM,
+        1,
+        1,
+        PSA_SLIM_CARD_BOX,
+        "One extended-art insert sized to a slim 3.14 x 5.30 in PSA cover case.",
+        None,
         3.0,
     ),
     "photo8x10": Profile(
@@ -241,7 +266,7 @@ def safe_slug(value: str) -> str:
 
 def validate_options(options: BuildOptions) -> None:
     if options.profile not in {*PROFILES, "both"}:
-        raise ValueError("profile must be standard, vaultx, psa, photo8x10, or both")
+        raise ValueError("profile must be standard, vaultx, psa, psaSlim, photo8x10, or both")
     if options.paper_format not in {*PAPER_SIZES_MM, "both"}:
         raise ValueError("paper_format must be a4, letter, or both")
     if options.source_mode not in {"crop", "fit"}:
@@ -424,6 +449,40 @@ def draw_cut_page(
             h_mm = profile.insert_h_mm * scale
             x_pt, y_pt = mm_to_pt(x_mm), mm_to_pt(y_mm)
             w_pt, h_pt = mm_to_pt(w_mm), mm_to_pt(h_mm)
+
+            # Keep the trim guide fully outside the artwork. A centered vector
+            # stroke at the exact trim boundary can rasterize into the image,
+            # while drawing it underneath can make it disappear entirely.
+            # Moving its center past half the stroke plus a tiny clearance
+            # preserves the finished art edge and leaves a visible cut guide.
+            pdf.setStrokeColor(line_color)
+            line_width_pt = 0.45 if profile.name == "psa" else 0.35
+            guide_offset_pt = line_width_pt / 2 + TRIM_GUIDE_CLEARANCE_PT
+            pdf.setLineWidth(line_width_pt)
+            if profile.name == "psa":
+                pdf.setLineCap(1)
+                pdf.setDash(0.6, 1.5)
+            guide_x = x_pt - guide_offset_pt
+            guide_y = y_pt - guide_offset_pt
+            guide_w = w_pt + 2 * guide_offset_pt
+            guide_h = h_pt + 2 * guide_offset_pt
+            if corner_radius_mm > 0:
+                radius_pt = min(mm_to_pt(corner_radius_mm * scale), w_pt / 2, h_pt / 2)
+                pdf.roundRect(
+                    guide_x,
+                    guide_y,
+                    guide_w,
+                    guide_h,
+                    radius_pt + guide_offset_pt,
+                    stroke=1,
+                    fill=0,
+                )
+            else:
+                pdf.rect(guide_x, guide_y, guide_w, guide_h, stroke=1, fill=0)
+            if profile.name == "psa":
+                pdf.setDash()
+                pdf.setLineCap(0)
+
             pdf.drawImage(
                 ImageReader(piece_list[index]),
                 x_pt,
@@ -449,20 +508,6 @@ def draw_cut_page(
                     pdf.roundRect(region_x, region_y, region_w, region_h, region_radius, stroke=1, fill=1)
                 else:
                     pdf.rect(region_x, region_y, region_w, region_h, stroke=1, fill=1)
-                pdf.setDash()
-                pdf.setLineCap(0)
-
-            pdf.setStrokeColor(line_color)
-            pdf.setLineWidth(0.45 if profile.name == "psa" else 0.35)
-            if profile.name == "psa":
-                pdf.setLineCap(1)
-                pdf.setDash(0.6, 1.5)
-            if corner_radius_mm > 0:
-                radius_pt = min(mm_to_pt(corner_radius_mm * scale), w_pt / 2, h_pt / 2)
-                pdf.roundRect(x_pt, y_pt, w_pt, h_pt, radius_pt, stroke=1, fill=0)
-            else:
-                pdf.rect(x_pt, y_pt, w_pt, h_pt, stroke=1, fill=0)
-            if profile.name == "psa":
                 pdf.setDash()
                 pdf.setLineCap(0)
             index += 1

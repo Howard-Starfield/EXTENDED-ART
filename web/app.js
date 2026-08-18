@@ -208,7 +208,9 @@ function updateStudioContract() {
       : "Turn off when mounting the real card over the finished print.";
   $("#cutReadyOutputHelp").textContent = profile.name === "psa"
     ? "White PSA label + card chambers with dotted guides"
-    : "Finished inserts with cut guides";
+    : profile.name === "psaSlim"
+      ? "White centered card chamber with dotted guide"
+      : "Finished inserts with cut guides";
   $("#psaLabelControls").hidden = profile.name !== "psa";
   updatePaperTools();
   updateExportSummary();

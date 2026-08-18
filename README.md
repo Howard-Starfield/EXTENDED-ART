@@ -2,7 +2,7 @@
 
 ## Install on Windows
 
-1. Download **`ExtendedArt-Setup-v1.7.0.exe`** from the
+1. Download **`ExtendedArt-Setup-v1.8.0.exe`** from the
    [latest GitHub release](https://github.com/Howard-Starfield/EXTENDED-ART/releases/latest).
 2. Run the installer. It installs per user and does not require administrator
    access by default.
@@ -75,7 +75,7 @@ Use **Change setup** in the top bar to switch product or paper without reloading
 Changing the product resets zoom and X/Y alignment because the canvas geometry
 has changed; uploaded source previews remain available.
 
-The top bar must show **v1.7.0** or newer.
+The top bar must show **v1.8.0** or newer.
 
 The browser studio defaults to the selected cut-ready PDF, matching print guide,
 reports, instructions, and ZIP. Piece PNGs, the master PNG, and the full-art PDF
@@ -347,7 +347,7 @@ To run from source:
 To build the Windows release, install `requirements-build.txt`, run
 `pyinstaller --noconfirm --clean ExtendedArtOffline.spec`, then compile
 `installer/ExtendedArt.iss` with Inno Setup 6. The installer is written to
-`release/ExtendedArt-Setup-v1.7.0.exe`.
+`release/ExtendedArt-Setup-v1.8.0.exe`.
 
 The packaged executable and the normal workflow make no network requests.
 
