@@ -36,8 +36,8 @@ class ProfileContractTests(unittest.TestCase):
             "standard": ((2232, 3118), (744, 1039), 9),
             "vaultx": ((2339, 3331), (780, 1110), 9),
             "psa": ((948, 1596), (948, 1596), 1),
-            "psaSlim": ((942, 1590), (942, 1590), 1),
             "psaCase": ((942, 1590), (942, 1590), 1),
+            "psaMini": ((942, 1590), (942, 1590), 1),
             "photo8x10": ((2400, 3000), (2400, 3000), 1),
         }
         for name, contract in expected.items():
@@ -147,9 +147,9 @@ class ProfileContractTests(unittest.TestCase):
             self.assertTrue(all("letter" in name for name in pdf_names))
 
 
-    def test_psa_slim_centered_card_chamber_contract(self) -> None:
-        profile = PROFILES["psaSlim"]
-        self.assertEqual(profile.label, "PSA Cover Edition (Slim)")
+    def test_psa_case_centered_card_chamber_contract(self) -> None:
+        profile = PROFILES["psaCase"]
+        self.assertEqual(profile.label, "PSA Cover Edition (CASE)")
         # 3.14 x 5.30 in = 79.756 x 134.62 mm
         self.assertAlmostEqual(profile.insert_w_mm, 79.756, places=5)
         self.assertAlmostEqual(profile.insert_h_mm, 134.62, places=5)
@@ -163,8 +163,8 @@ class ProfileContractTests(unittest.TestCase):
         self.assertAlmostEqual(profile.card_box[1] * profile.insert_h_mm,
                                (134.62 - 88.0) / 2, places=5)
 
-    def test_psa_case_slim_labeled_envelope_keeps_psa_internal_positions(self) -> None:
-        profile = PROFILES["psaCase"]
+    def test_psa_mini_slim_labeled_envelope_keeps_psa_internal_positions(self) -> None:
+        profile = PROFILES["psaMini"]
         self.assertEqual(profile.label, "PSA SLAB (CASE)")
         # 3.14 x 5.30 in = 79.756 x 134.62 mm
         self.assertAlmostEqual(profile.insert_w_mm, 79.756, places=5)
@@ -186,7 +186,7 @@ class ProfileContractTests(unittest.TestCase):
                            (profile.card_box[3] - profile.card_box[1]) * profile.insert_h_mm)],
                          [63.0, 88.0])
 
-    def test_psa_case_cut_ready_package_uses_label_plus_chamber(self) -> None:
+    def test_psa_mini_cut_ready_package_uses_label_plus_chamber(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             source_path = root / "source.png"
@@ -195,13 +195,13 @@ class ProfileContractTests(unittest.TestCase):
                 source_path,
                 root / "output",
                 options=BuildOptions(
-                    profile="psaCase",
+                    profile="psaMini",
                     paper_format="letter",
                     cutout_card_zone=True,
                 ),
             )
             manifest = json.loads(Path(result["manifest"]).read_text(encoding="utf-8"))
-            profile_result = manifest["profiles"]["psaCase"]
+            profile_result = manifest["profiles"]["psaMini"]
             self.assertEqual([page["type"] for page in profile_result["pages"]], ["cut_ready"])
             cutout_labels = {
                 cutout["label"] for cutout in profile_result["pages"][0]["cutouts"]
@@ -216,7 +216,7 @@ class ProfileContractTests(unittest.TestCase):
             self.assertEqual(cutouts["PSA label"], [5.207, 5.0, 69.85, 21.59])
             self.assertEqual(cutouts["card chamber"], [8.632, 36.0, 63.0, 88.0])
 
-    def test_psa_slim_cut_ready_package_uses_single_chamber(self) -> None:
+    def test_psa_case_cut_ready_package_uses_single_chamber(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             source_path = root / "source.png"
@@ -225,13 +225,13 @@ class ProfileContractTests(unittest.TestCase):
                 source_path,
                 root / "output",
                 options=BuildOptions(
-                    profile="psaSlim",
+                    profile="psaCase",
                     paper_format="letter",
                     cutout_card_zone=True,
                 ),
             )
             manifest = json.loads(Path(result["manifest"]).read_text(encoding="utf-8"))
-            profile_result = manifest["profiles"]["psaSlim"]
+            profile_result = manifest["profiles"]["psaCase"]
             self.assertEqual([page["type"] for page in profile_result["pages"]], ["cut_ready"])
             cutout_labels = {
                 cutout["label"] for cutout in profile_result["pages"][0]["cutouts"]
