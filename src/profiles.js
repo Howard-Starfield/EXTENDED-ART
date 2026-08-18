@@ -82,6 +82,30 @@ export const fallbackProfiles = {
     label_box: null,
     recommended_corner_radius_mm: 3,
   },
+  psaCase: {
+    name: "psaCase",
+    version: PROFILE_VERSION,
+    label: "PSA SLAB (CASE)",
+    grid: [1, 1],
+    piece_count: 1,
+    // 3.14" × 5.30" target = 79.756 × 134.62 mm.
+    // Slim variant of the psa profile: smaller outer envelope, but the internal
+    // PSA label cutout and card chamber are kept at the same millimetre positions
+    // as the full psa so existing artwork can be reused as-is.
+    insert_mm: [79.756, 134.62],
+    insert_px: [942, 1590],
+    master_mm: [79.756, 134.62],
+    master_px: [942, 1590],
+    card_box: [
+      8.632 / 79.756,
+      36 / 134.62,
+      71.632 / 79.756,
+      124 / 134.62,
+    ],
+    label_box: [5.207 / 79.756, 5 / 134.62, 75.057 / 79.756, 26.59 / 134.62],
+    label_box_mm: [5.207, 5, 69.85, 21.59],
+    recommended_corner_radius_mm: 3,
+  },
   photo8x10: {
     name: "photo8x10",
     version: PROFILE_VERSION,
@@ -112,7 +136,7 @@ export function pixelPair(values) {
 }
 
 export function isSlabProfile(profile) {
-  return profile?.name === "psa" || profile?.name === "cardslab" || profile?.name === "psaSlim";
+  return profile?.name === "psa" || profile?.name === "cardslab" || profile?.name === "psaSlim" || profile?.name === "psaCase";
 }
 
 export function isSingleDisplayProfile(profile) {

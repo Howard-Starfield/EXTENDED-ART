@@ -40,7 +40,7 @@ describe("pdf export adapter", () => {
   });
 
   it("keeps PSA and frame outputs as one exact-size page with chamber geometry", async () => {
-    for (const name of ["psa", "psaSlim", "cardslab", "photo8x10"]) {
+    for (const name of ["psa", "psaCase", "psaSlim", "cardslab", "photo8x10"]) {
       const profile = fallbackProfiles[name];
       const paper = fallbackPapers.letter;
       const sources = new Map(getPageLayoutIds(profile, paper).map((id) => [id, tinyPng()]));
@@ -50,10 +50,11 @@ describe("pdf export adapter", () => {
   });
 
   it("anchors SVG cutout paths at the physical top edge", () => {
-    for (const name of ["psa", "psaSlim", "cardslab", "photo8x10"]) {
+    for (const name of ["psa", "psaCase", "psaSlim", "cardslab", "photo8x10"]) {
       const profile = fallbackProfiles[name];
       const placement = createPageLayout(profile, fallbackPapers.letter).placements[0];
-      const cutout = getCutoutGeometry(profile)[name === "psa" ? 1 : 0];
+      // psa and psaCase have two cutouts (label + card); the rest have just the card.
+      const cutout = getCutoutGeometry(profile)[name === "psa" || name === "psaCase" ? 1 : 0];
       const rect = cutoutRect(profile, placement, cutout);
       expect(svgPathOrigin(rect)).toEqual({ x: rect.x, y: rect.y + rect.height });
     }

@@ -44,7 +44,7 @@ describe("exact page layout contract", () => {
   });
 
   it("changes only the sheet contract between A4 and Letter", () => {
-    for (const name of ["standard", "psa", "psaSlim", "cardslab", "photo8x10"]) {
+    for (const name of ["standard", "psa", "psaCase", "psaSlim", "cardslab", "photo8x10"]) {
       const a4 = createPageLayout(fallbackProfiles[name], fallbackPapers.a4);
       const letter = createPageLayout(fallbackProfiles[name], fallbackPapers.letter);
       expect(a4.pageSizeMm).toEqual([210, 297]);

@@ -175,12 +175,12 @@ function updateStudioContract() {
   $("#pieceContract").textContent = pixelPair(profile.insert_px);
   $("#paperContract").textContent = `${paper.label} / ${paper.size_mm.map(cleanMeasure).join(" × ")} mm`;
   $("#includeCardHelp").textContent = "Off by default to save ink; the cut-ready package leaves the center/card chamber empty.";
-  $("#cutReadyOutputHelp").textContent = profile.name === "psa"
+  $("#cutReadyOutputHelp").textContent = profile.name === "psa" || profile.name === "psaCase"
     ? "White PSA label + card chambers with dotted guides"
     : profile.name === "cardslab" || profile.name === "psaSlim"
       ? "White centered card chamber with dotted guide"
       : "Finished outer pieces with cut guides";
-  $("#psaLabelControls").hidden = profile.name !== "psa";
+  $("#psaLabelControls").hidden = profile.name !== "psa" && profile.name !== "psaCase";
   updatePaperTools();
   updateExportSummary();
   updateQualityNotice();
