@@ -36,6 +36,13 @@ PSA_SLIM_OUTER_MM = (79.756, 134.62)
 PSA_SLIM_CARD_MM = (63.0, 88.0)
 # Card is centered vertically inside the slim cover (no PSA label area below).
 PSA_SLIM_CARD_TOP_MM = (PSA_SLIM_OUTER_MM[1] - PSA_SLIM_CARD_MM[1]) / 2
+# PSA SLAB (CASE) — slim labeled variant of the psa profile. The outer envelope
+# is the same 3.14 × 5.30 in as PSA Cover Edition (Slim), but the internal PSA
+# label cutout and card chamber are kept at the same millimetre positions as
+# the full psa profile so existing artwork can be reused.
+PSA_CASE_OUTER_MM = (79.756, 134.62)
+PSA_CASE_CARD_MM = (63.0, 88.0)
+PSA_CASE_CARD_TOP_MM = 36.0  # same internal position as the full psa
 
 
 @dataclass(frozen=True)
@@ -128,17 +135,30 @@ PSA_SLIM_CARD_BOX = normalized_box_from_mm(
     PSA_SLIM_CARD_TOP_MM,
     *PSA_SLIM_CARD_MM,
 )
+PSA_CASE_LABEL_BOX = normalized_box_from_mm(
+    *PSA_CASE_OUTER_MM,
+    (PSA_CASE_OUTER_MM[0] - PSA_LABEL_MM[0]) / 2,
+    PSA_LABEL_TOP_MM,
+    *PSA_LABEL_MM,
+)
+PSA_CASE_CARD_BOX = normalized_box_from_mm(
+    *PSA_CASE_OUTER_MM,
+    (PSA_CASE_OUTER_MM[0] - PSA_CASE_CARD_MM[0]) / 2,
+    PSA_CASE_CARD_TOP_MM,
+    *PSA_CASE_CARD_MM,
+)
 
 
 def profile_for_options(profile: Profile, options: BuildOptions) -> Profile:
     """Return a profile with per-job physical cutout settings applied."""
-    if profile.name != "psa":
+    if profile.name not in ("psa", "psaCase"):
         return profile
+    outer_mm = PSA_OUTER_MM if profile.name == "psa" else PSA_CASE_OUTER_MM
     width_mm = float(options.psa_label_width_mm)
     height_mm = float(options.psa_label_height_mm)
     label_box = normalized_box_from_mm(
-        *PSA_OUTER_MM,
-        (PSA_OUTER_MM[0] - width_mm) / 2,
+        *outer_mm,
+        (outer_mm[0] - width_mm) / 2,
         PSA_LABEL_TOP_MM,
         width_mm,
         height_mm,
@@ -191,6 +211,17 @@ PROFILES = {
         PSA_SLIM_CARD_BOX,
         "One extended-art insert sized to a slim 3.14 x 5.30 in PSA cover case.",
         None,
+        3.0,
+    ),
+    "psaCase": Profile(
+        "psaCase",
+        "PSA SLAB (CASE)",
+        *PSA_CASE_OUTER_MM,
+        1,
+        1,
+        PSA_CASE_CARD_BOX,
+        "One extended-art insert sized to a slim 3.14 x 5.30 in PSA slab case (with label area).",
+        PSA_CASE_LABEL_BOX,
         3.0,
     ),
     "photo8x10": Profile(
@@ -266,7 +297,7 @@ def safe_slug(value: str) -> str:
 
 def validate_options(options: BuildOptions) -> None:
     if options.profile not in {*PROFILES, "both"}:
-        raise ValueError("profile must be standard, vaultx, psa, psaSlim, photo8x10, or both")
+        raise ValueError("profile must be standard, vaultx, psa, psaSlim, psaCase, photo8x10, or both")
     if options.paper_format not in {*PAPER_SIZES_MM, "both"}:
         raise ValueError("paper_format must be a4, letter, or both")
     if options.source_mode not in {"crop", "fit"}:

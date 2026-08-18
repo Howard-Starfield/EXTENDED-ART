@@ -37,6 +37,7 @@ class ProfileContractTests(unittest.TestCase):
             "vaultx": ((2339, 3331), (780, 1110), 9),
             "psa": ((948, 1596), (948, 1596), 1),
             "psaSlim": ((942, 1590), (942, 1590), 1),
+            "psaCase": ((942, 1590), (942, 1590), 1),
             "photo8x10": ((2400, 3000), (2400, 3000), 1),
         }
         for name, contract in expected.items():
@@ -161,6 +162,59 @@ class ProfileContractTests(unittest.TestCase):
                                (79.756 - 63.0) / 2, places=5)
         self.assertAlmostEqual(profile.card_box[1] * profile.insert_h_mm,
                                (134.62 - 88.0) / 2, places=5)
+
+    def test_psa_case_slim_labeled_envelope_keeps_psa_internal_positions(self) -> None:
+        profile = PROFILES["psaCase"]
+        self.assertEqual(profile.label, "PSA SLAB (CASE)")
+        # 3.14 x 5.30 in = 79.756 x 134.62 mm
+        self.assertAlmostEqual(profile.insert_w_mm, 79.756, places=5)
+        self.assertAlmostEqual(profile.insert_h_mm, 134.62, places=5)
+        self.assertEqual(profile.master_px, (942, 1590))
+        self.assertEqual(profile.insert_px, (942, 1590))
+        # The label cutout and card chamber use the same internal mm positions
+        # as the full psa profile, so existing artwork can be reused.
+        self.assertIsNotNone(profile.label_box)
+        label_mm = normalized_box_to_mm(profile, profile.label_box)
+        self.assertEqual([round(value, 3) for value in label_mm],
+                         [5.207, 5.0, 69.85, 21.59])
+        self.assertEqual([round(value, 3) for value in
+                          (profile.card_box[1] * profile.insert_h_mm,
+                           profile.card_box[3] * profile.insert_h_mm)],
+                         [36.0, 124.0])
+        self.assertEqual([round(value, 3) for value in
+                          ((profile.card_box[2] - profile.card_box[0]) * profile.insert_w_mm,
+                           (profile.card_box[3] - profile.card_box[1]) * profile.insert_h_mm)],
+                         [63.0, 88.0])
+
+    def test_psa_case_cut_ready_package_uses_label_plus_chamber(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source_path = root / "source.png"
+            Image.new("RGB", (600, 900), "navy").save(source_path)
+            result = build_package(
+                source_path,
+                root / "output",
+                options=BuildOptions(
+                    profile="psaCase",
+                    paper_format="letter",
+                    cutout_card_zone=True,
+                ),
+            )
+            manifest = json.loads(Path(result["manifest"]).read_text(encoding="utf-8"))
+            profile_result = manifest["profiles"]["psaCase"]
+            self.assertEqual([page["type"] for page in profile_result["pages"]], ["cut_ready"])
+            cutout_labels = {
+                cutout["label"] for cutout in profile_result["pages"][0]["cutouts"]
+            }
+            # Slim labeled case has both the PSA label cutout and the card chamber.
+            self.assertEqual(cutout_labels, {"PSA label", "card chamber"})
+            self.assertTrue(profile_result["pages"][0]["dotted_guides"])
+            cutouts = {
+                cutout["label"]: cutout["box_mm"]
+                for cutout in profile_result["pages"][0]["cutouts"]
+            }
+            self.assertEqual(cutouts["PSA label"], [5.207, 5.0, 69.85, 21.59])
+            self.assertEqual(cutouts["card chamber"], [8.632, 36.0, 63.0, 88.0])
 
     def test_psa_slim_cut_ready_package_uses_single_chamber(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

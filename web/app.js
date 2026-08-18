@@ -203,15 +203,15 @@ function updateStudioContract() {
   $("#paperContract").textContent = paper.label + " / 300 DPI";
   $("#includeCardHelp").textContent = isBinder
     ? "Turn off when the real card will go in the binder."
-    : profile.name === "psa"
+    : profile.name === "psa" || profile.name === "psaCase"
       ? "Turn off when the physical slab will cover this card zone."
       : "Turn off when mounting the real card over the finished print.";
-  $("#cutReadyOutputHelp").textContent = profile.name === "psa"
+  $("#cutReadyOutputHelp").textContent = profile.name === "psa" || profile.name === "psaCase"
     ? "White PSA label + card chambers with dotted guides"
     : profile.name === "psaSlim"
       ? "White centered card chamber with dotted guide"
       : "Finished inserts with cut guides";
-  $("#psaLabelControls").hidden = profile.name !== "psa";
+  $("#psaLabelControls").hidden = profile.name !== "psa" && profile.name !== "psaCase";
   updatePaperTools();
   updateExportSummary();
   requestRender();
