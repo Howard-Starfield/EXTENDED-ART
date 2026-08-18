@@ -364,7 +364,7 @@ function updateQualityReport(alignment = state.matcherDiagnostics) {
     artDimensions: state.artDimensions,
     cardDimensions: state.cardDimensions,
     alignment,
-    labelBox: profile.name === "psa" ? currentPsaLabelBox() : null,
+    labelBox: profile.name === "psa" || profile.name === "psaMini" ? currentPsaLabelBox() : null,
     cornerRadiusMm: state.cornerRadiusMm,
     currentTransform: currentAlignmentSnapshot(),
     preservedAlignment: Boolean(state.lastStableAlignment),
@@ -813,7 +813,7 @@ function render() {
     artImage: state.artImage,
     cardImage: state.cardImage,
     includeCard: includeCardRequested(),
-    labelBox: profile.name === "psa" ? currentPsaLabelBox() : null,
+    labelBox: profile.name === "psa" || profile.name === "psaMini" ? currentPsaLabelBox() : null,
   });
   state.offsetX = result.offsetX;
   state.offsetY = result.offsetY;
