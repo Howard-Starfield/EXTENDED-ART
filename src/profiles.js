@@ -59,6 +59,29 @@ export const fallbackProfiles = {
     label_box: null,
     recommended_corner_radius_mm: 3,
   },
+  psaSlim: {
+    name: "psaSlim",
+    version: PROFILE_VERSION,
+    label: "PSA Cover Edition (Slim)",
+    grid: [1, 1],
+    piece_count: 1,
+    // 3.14" × 5.30" target = 79.756 × 134.62 mm.
+    // Shaves ~0.51 mm off the modern PSA envelope (80.264 × 135.128) on each axis
+    // so the artwork seats safely inside a slim cover/case without binding the edges.
+    insert_mm: [79.756, 134.62],
+    insert_px: [942, 1590],
+    master_mm: [79.756, 134.62],
+    master_px: [942, 1590],
+    // 63 × 88 mm card centered inside the slim cover.
+    card_box: [
+      8.378 / 79.756,
+      23.31 / 134.62,
+      71.378 / 79.756,
+      111.31 / 134.62,
+    ],
+    label_box: null,
+    recommended_corner_radius_mm: 3,
+  },
   photo8x10: {
     name: "photo8x10",
     version: PROFILE_VERSION,
@@ -89,7 +112,7 @@ export function pixelPair(values) {
 }
 
 export function isSlabProfile(profile) {
-  return profile?.name === "psa" || profile?.name === "cardslab";
+  return profile?.name === "psa" || profile?.name === "cardslab" || profile?.name === "psaSlim";
 }
 
 export function isSingleDisplayProfile(profile) {

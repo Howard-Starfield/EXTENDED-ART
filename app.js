@@ -177,7 +177,7 @@ function updateStudioContract() {
   $("#includeCardHelp").textContent = "Off by default to save ink; the cut-ready package leaves the center/card chamber empty.";
   $("#cutReadyOutputHelp").textContent = profile.name === "psa"
     ? "White PSA label + card chambers with dotted guides"
-    : profile.name === "cardslab"
+    : profile.name === "cardslab" || profile.name === "psaSlim"
       ? "White centered card chamber with dotted guide"
       : "Finished outer pieces with cut guides";
   $("#psaLabelControls").hidden = profile.name !== "psa";
