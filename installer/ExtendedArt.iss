@@ -1,5 +1,5 @@
 #define MyAppName "ExtendedArt"
-#define MyAppVersion "1.7.0"
+#define MyAppVersion "1.8.0"
 #define MyAppPublisher "Howard Starfield"
 #define MyAppURL "https://github.com/Howard-Starfield/EXTENDED-ART"
 #define MyAppExeName "ExtendedArtOffline.exe"
@@ -22,6 +22,7 @@ OutputBaseFilename=ExtendedArt-Setup-v{#MyAppVersion}
 Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern
+SetupIconFile=..\assets\branding\extendedart.ico
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
 ArchitecturesAllowed=x64compatible
@@ -42,9 +43,9 @@ Source: "..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\THIRD_PARTY_NOTICES.txt"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
-Name: "{autoprograms}\ExtendedArt"; Filename: "{app}\{#MyAppExeName}"; Parameters: "web"; WorkingDir: "{app}"
+Name: "{autoprograms}\ExtendedArt"; Filename: "{app}\{#MyAppExeName}"; Parameters: "web"; WorkingDir: "{app}"; IconFilename: "{app}\{#MyAppExeName}"
 Name: "{autoprograms}\Uninstall ExtendedArt"; Filename: "{uninstallexe}"
-Name: "{autodesktop}\ExtendedArt"; Filename: "{app}\{#MyAppExeName}"; Parameters: "web"; WorkingDir: "{app}"; Tasks: desktopicon
+Name: "{autodesktop}\ExtendedArt"; Filename: "{app}\{#MyAppExeName}"; Parameters: "web"; WorkingDir: "{app}"; IconFilename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Parameters: "web"; Description: "Launch ExtendedArt"; Flags: nowait postinstall skipifsilent

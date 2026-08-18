@@ -24,6 +24,7 @@ exe = EXE(
     [],
     name='ExtendedArtOffline',
     version='installer/version_info.txt',
+    icon='assets\\branding\\extendedart.ico',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
