@@ -48,7 +48,7 @@ export function getCutoutGeometry(
   { labelBox = profile.label_box, cornerRadiusMm = profile.recommended_corner_radius_mm || 0 } = {},
 ) {
   const cutouts = [];
-  if ((profile.name === "psa" || profile.name === "psaCase") && labelBox) {
+  if ((profile.name === "psa" || profile.name === "psaMini") && labelBox) {
     cutouts.push({ id: "PSA_LABEL", label: "PSA LABEL CUTOUT", box: labelBox, radiusMm: cornerRadiusMm });
   }
   if (isSlabProfile(profile)) {

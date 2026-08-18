@@ -39,9 +39,9 @@ describe("print profile contracts", () => {
     expect(profile.card_box[3] * profile.master_mm[1]).toBeCloseTo((135.128 + 88) / 2, 8);
   });
 
-  it("sizes the PSA Cover Edition (Slim) to 3.14 by 5.30 inches with a centered card", () => {
-    const profile = fallbackProfiles.psaSlim;
-    expect(profile.label).toBe("PSA Cover Edition (Slim)");
+  it("sizes the PSA Cover Edition (CASE) to 3.14 by 5.30 inches with a centered card", () => {
+    const profile = fallbackProfiles.psaCase;
+    expect(profile.label).toBe("PSA Cover Edition (CASE)");
     expect(profile.master_mm).toEqual([79.756, 134.62]);
     expect(profile.master_px).toEqual([942, 1590]);
     expect(profile.insert_px).toEqual([942, 1590]);
@@ -59,7 +59,7 @@ describe("print profile contracts", () => {
   });
 
   it("sizes the PSA SLAB (CASE) to 3.14 by 5.30 inches and keeps the psa label + card chamber positions", () => {
-    const profile = fallbackProfiles.psaCase;
+    const profile = fallbackProfiles.psaMini;
     expect(profile.label).toBe("PSA SLAB (CASE)");
     expect(profile.master_mm).toEqual([79.756, 134.62]);
     expect(profile.master_px).toEqual([942, 1590]);

@@ -148,7 +148,7 @@ export async function createBrowserPrintPackage({
 }) {
   if (!state?.artImage || !state?.cardImage) throw new Error("Upload both the extended artwork and original card before exporting.");
   const options = outputOptions(requestedOptions);
-  const labelBox = profile.name === "psa" || profile.name === "psaCase" ? psaLabelBox(profile, state.psaLabelWidthMm, state.psaLabelHeightMm) : null;
+  const labelBox = profile.name === "psa" || profile.name === "psaMini" ? psaLabelBox(profile, state.psaLabelWidthMm, state.psaLabelHeightMm) : null;
   const outputPaperSet = outputPapers({ paper, papers: state.papers, includeSecondPaper: options.includeSecondPaper });
   const layouts = outputPaperSet.map((item) => createPageLayout(profile, item));
   const layout = layouts[0];
