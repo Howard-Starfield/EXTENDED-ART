@@ -57,6 +57,8 @@ const state = {
   zoom: 1,
   offsetX: 0,
   offsetY: 0,
+  cardOffsetX: 0,
+  cardOffsetY: 0,
   opacity: 0.72,
   cornerRadiusMm: 3,
   psaLabelWidthMm: 69.85,
@@ -71,6 +73,18 @@ const state = {
 
 function activeProfile() { return state.profiles[state.profile] || fallbackProfiles.standard; }
 function activePaper() { return state.papers[state.paper] || fallbackPapers.a4; }
+
+function effectiveCardBox() {
+  const profile = activeProfile();
+  const isBinder = profile.piece_count > 1;
+  if (!isBinder) return profile.card_box;
+  const cardW = profile.card_box[2] - profile.card_box[0];
+  const cardH = profile.card_box[3] - profile.card_box[1];
+  const left = profile.card_box[0] + state.cardOffsetX / profile.master_px[0];
+  const top = profile.card_box[1] + state.cardOffsetY / profile.master_px[1];
+  return [left, top, left + cardW, top + cardH];
+}
+
 function cleanMeasure(value) { return Number.isInteger(value) ? String(value) : Number(value).toFixed(1).replace(/\.0$/, ""); }
 function pixelPair(values) { return values[0] + " × " + values[1]; }
 
@@ -212,6 +226,7 @@ function updateStudioContract() {
       ? "White centered card chamber with dotted guide"
       : "Finished inserts with cut guides";
   $("#psaLabelControls").hidden = profile.name !== "psa" && profile.name !== "psaMini";
+  $("#cardPositionControls").hidden = profile.piece_count <= 1;
   updatePaperTools();
   updateExportSummary();
   requestRender();
@@ -367,11 +382,12 @@ function render() {
   const cellW = width / columns;
   const cellH = height / rows;
   const pieceRadius = (state.cornerRadiusMm / profile.insert_mm[0]) * cellW;
-  const cardX = profile.card_box[0] * width;
-  const cardY = profile.card_box[1] * height;
-  const cardWBox = (profile.card_box[2] - profile.card_box[0]) * width;
-  const cardHBox = (profile.card_box[3] - profile.card_box[1]) * height;
-  const cardWidthMm = profile.master_mm[0] * (profile.card_box[2] - profile.card_box[0]);
+  const cardBox = effectiveCardBox();
+  const cardX = cardBox[0] * width;
+  const cardY = cardBox[1] * height;
+  const cardWBox = (cardBox[2] - cardBox[0]) * width;
+  const cardHBox = (cardBox[3] - cardBox[1]) * height;
+  const cardWidthMm = profile.master_mm[0] * (cardBox[2] - cardBox[0]);
   const cardRadius = (state.cornerRadiusMm / cardWidthMm) * cardWBox;
   if (state.cardImage && state.showCard) {
     const cardScale = Math.max(
@@ -391,7 +407,7 @@ function render() {
   if (state.artImage && (profile.name === "psa" || profile.name === "psaMini")) {
     const cutouts = [];
     if (profile.label_box) cutouts.push(["PSA LABEL CUTOUT", psaLabelBox(profile), 2]);
-    if (!$("#includeCard").checked) cutouts.push(["CARD CUTOUT", profile.card_box, cardRadius]);
+    if (!$("#includeCard").checked) cutouts.push(["CARD CUTOUT", cardBox, cardRadius]);
     ctx.save();
     for (const [label, box, radius] of cutouts) {
       const cutX = box[0] * width;
@@ -440,14 +456,20 @@ function render() {
   const xPixels = Math.round(state.offsetX * profile.master_px[0]);
   const yPixels = Math.round(state.offsetY * profile.master_px[1]);
   $("#offsetValue").textContent = "X " + xPixels + " / Y " + yPixels;
+  $("#cardOffsetValue").textContent = "X " + Math.round(state.cardOffsetX) + " / Y " + Math.round(state.cardOffsetY);
 }
 
 function resetAlignment(announce = true) {
   state.zoom = 1;
   state.offsetX = 0;
   state.offsetY = 0;
+  state.cardOffsetX = 0;
+  state.cardOffsetY = 0;
   $("#zoomRange").value = "100";
   $("#zoomValue").textContent = "100%";
+  $("#cardOffsetXRange").value = "0";
+  $("#cardOffsetYRange").value = "0";
+  $("#cardOffsetValue").textContent = "X 0 / Y 0";
   requestRender();
   if (announce) showToast("Artwork fit to the full page.");
 }
@@ -607,6 +629,44 @@ document.querySelectorAll("[data-nudge]").forEach((button) => {
 });
 $("#resetButton").addEventListener("click", resetAlignment);
 
+// Card position controls
+function nudgeCard(dx, dy, amount = 1) {
+  state.cardOffsetX += dx * amount;
+  state.cardOffsetY += dy * amount;
+  $("#cardOffsetXRange").value = String(Math.round(state.cardOffsetX));
+  $("#cardOffsetYRange").value = String(Math.round(state.cardOffsetY));
+  $("#cardOffsetXOut").textContent = Math.round(state.cardOffsetX) + " px";
+  $("#cardOffsetYOut").textContent = Math.round(state.cardOffsetY) + " px";
+  requestRender();
+}
+
+$("#cardOffsetXRange").addEventListener("input", (event) => {
+  state.cardOffsetX = Number(event.target.value);
+  $("#cardOffsetXOut").textContent = Math.round(state.cardOffsetX) + " px";
+  requestRender();
+});
+$("#cardOffsetYRange").addEventListener("input", (event) => {
+  state.cardOffsetY = Number(event.target.value);
+  $("#cardOffsetYOut").textContent = Math.round(state.cardOffsetY) + " px";
+  requestRender();
+});
+document.querySelectorAll("[data-card-nudge]").forEach((button) => {
+  button.addEventListener("click", () => {
+    const values = button.dataset.cardNudge.split(",").map(Number);
+    nudgeCard(values[0], values[1], 4);
+  });
+});
+$("#resetCardPosition").addEventListener("click", () => {
+  state.cardOffsetX = 0;
+  state.cardOffsetY = 0;
+  $("#cardOffsetXRange").value = "0";
+  $("#cardOffsetYRange").value = "0";
+  $("#cardOffsetXOut").textContent = "0 px";
+  $("#cardOffsetYOut").textContent = "0 px";
+  requestRender();
+  showToast("Card position reset to center.");
+});
+
 $("#zoomRange").addEventListener("input", (event) => {
   state.zoom = Number(event.target.value) / 100;
   $("#zoomValue").textContent = event.target.value + "%";
@@ -700,6 +760,8 @@ $("#exportButton").addEventListener("click", async () => {
     zoom: state.zoom,
     offset_x: state.offsetX,
     offset_y: state.offsetY,
+    card_offset_x: state.cardOffsetX,
+    card_offset_y: state.cardOffsetY,
     include_card: $("#includeCard").checked,
     corner_radius_mm: state.cornerRadiusMm,
     profile: state.profile,

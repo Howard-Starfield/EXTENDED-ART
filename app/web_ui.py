@@ -330,9 +330,17 @@ def suggest_alignment(source: Image.Image, card: Image.Image, profile_name: str)
 
 
 
-def add_center_card(master: Image.Image, card: Image.Image, profile) -> tuple[Image.Image, dict]:
+def add_center_card(master: Image.Image, card: Image.Image, profile, card_offset_x: float = 0.0, card_offset_y: float = 0.0) -> tuple[Image.Image, dict]:
     card = ImageOps.exif_transpose(card).convert("RGBA")
     left, top, right, bottom = profile.card_box
+    # Apply card position offset for binder profiles (piece_count > 1)
+    if profile.piece_count > 1:
+        card_w = right - left
+        card_h = bottom - top
+        left = left + card_offset_x / profile.master_px[0]
+        top = top + card_offset_y / profile.master_px[1]
+        right = left + card_w
+        bottom = top + card_h
     box = (
         round(left * master.width),
         round(top * master.height),
@@ -396,6 +404,8 @@ def process_web_job(
     zoom = float(settings.get("zoom", 1.0))
     offset_x = float(settings.get("offset_x", 0.0))
     offset_y = float(settings.get("offset_y", 0.0))
+    card_offset_x = float(settings.get("card_offset_x", 0.0))
+    card_offset_y = float(settings.get("card_offset_y", 0.0))
     include_card = boolean_setting(settings, "include_card")
     include_pieces = boolean_setting(settings, "include_pieces")
     include_master = boolean_setting(settings, "include_master")
@@ -423,7 +433,7 @@ def process_web_job(
             if not card_path:
                 raise ValueError("Upload the original card before including it in the print.")
             with Image.open(card_path) as card:
-                master, card_info = add_center_card(master, card, profile)
+                master, card_info = add_center_card(master, card, profile, card_offset_x, card_offset_y)
         aligned_path = job_dir / f"{slug}_aligned_master.png"
         master.save(aligned_path, format="PNG", dpi=(300, 300))
         provenance = {
@@ -431,6 +441,7 @@ def process_web_job(
             "center_card": card_info,
             "reference_card_uploaded": card_path is not None,
             "corner_radius_mm": corner_radius_mm,
+            "card_offset_px": [card_offset_x, card_offset_y],
             "profile": profile_name,
             "paper_format": paper_format,
             "cutout_card_zone": cutout_card_zone,

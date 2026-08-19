@@ -427,6 +427,11 @@ input[type="range"]::-webkit-slider-thumb {
 .nudge-pad [data-nudge="1,0"] { grid-area: right; }
 .nudge-pad [data-nudge="0,1"] { grid-area: down; }
 #resetButton { grid-area: reset; color: var(--coral); }
+.nudge-pad [data-card-nudge="0,-1"] { grid-area: up; }
+.nudge-pad [data-card-nudge="-1,0"] { grid-area: left; }
+.nudge-pad [data-card-nudge="1,0"] { grid-area: right; }
+.nudge-pad [data-card-nudge="0,1"] { grid-area: down; }
+.nudge-pad #resetCardPosition { grid-area: reset; color: var(--coral); }
 .check-row {
   display: flex; gap: 9px; align-items: flex-start; margin: 8px 0; cursor: pointer;
 }
@@ -544,6 +549,72 @@ button:focus-visible, a:focus-visible, label:has(input:focus-visible) {
   .view-tools { flex-wrap: wrap; justify-content: flex-end; }
   .light-table { min-height: 450px; padding-inline: 25px; }
   .canvas-caption { gap: 6px 9px; font-size: 8px; }
+}
+
+/* Card position controls */
+.card-position-controls {
+  border-top: 1px solid rgba(23,27,29,.12);
+  padding-top: 14px;
+  margin-top: 4px;
+}
+.card-position-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 10px;
+}
+.card-position-heading strong {
+  font-size: 13px;
+  color: var(--ink);
+  font-weight: 700;
+}
+.card-position-heading span {
+  font-size: 10px;
+  color: #687174;
+}
+.card-position-sliders {
+  display: grid;
+  grid-template-columns: 52px 1fr;
+  gap: 6px 8px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.card-position-sliders label {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 11px;
+  font-family: "Cascadia Mono", monospace;
+  color: var(--ink);
+}
+.card-position-sliders label output {
+  font-size: 10px;
+  color: var(--cyan-dark);
+  min-width: 42px;
+  text-align: right;
+}
+.card-position-sliders input[type="range"] {
+  width: 100%;
+  accent-color: var(--coral);
+}
+.card-position-nudge {
+  margin-top: 6px;
+}
+.card-position-nudge label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+.card-position-nudge label span {
+  font-size: 11px;
+  color: var(--ink);
+  font-weight: 600;
+}
+.card-position-nudge label output {
+  font-size: 10px;
+  font-family: "Cascadia Mono", monospace;
+  color: var(--cyan-dark);
 }
 
 @media (prefers-reduced-motion: reduce) {
