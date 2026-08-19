@@ -1,6 +1,9 @@
 import {
   cleanMeasure,
   cardPhysicalMm,
+  cellCardOffset,
+  cellFromCardOffset,
+  cellName,
   fallbackPapers,
   fallbackProfiles,
   isSlabProfile,
@@ -182,6 +185,7 @@ function updateStudioContract() {
       : "Finished outer pieces with cut guides";
   $("#psaLabelControls").hidden = profile.name !== "psa" && profile.name !== "psaMini";
   $("#cardPositionControls").hidden = !profile.piece_count || profile.piece_count <= 1;
+  syncCardPositionControls();
   updatePaperTools();
   updateExportSummary();
   updateQualityNotice();
@@ -232,6 +236,19 @@ function applySetup(event) {
     state.lastStableAlignment = null;
     state.alignmentSnapshot = null;
     applyCenterFit();
+    // Reset the original-card cell back to the centre of the new profile so
+    // an offset tuned for, say, "standard 3x3" doesn't strand the card in an
+    // out-of-bounds position on "vaultx".
+    const profile = activeProfile();
+    if (profile.piece_count > 1) {
+      const [cols, rows] = profile.grid;
+      const [centerX, centerY] = cellCardOffset(profile, Math.floor(cols / 2), Math.floor(rows / 2));
+      state.cardOffsetX = centerX;
+      state.cardOffsetY = centerY;
+    } else {
+      state.cardOffsetX = 0;
+      state.cardOffsetY = 0;
+    }
     $("#autoAlignStatus").hidden = true;
   }
   updateStudioContract();
@@ -821,14 +838,21 @@ function render() {
   const xPixels = Math.round(state.offsetX * profile.master_px[0]);
   const yPixels = Math.round(state.offsetY * profile.master_px[1]);
   $("#offsetValue").textContent = `X ${xPixels} / Y ${yPixels}`;
-  $("#cardOffsetValue").textContent = `X ${Math.round(state.cardOffsetX)} / Y ${Math.round(state.cardOffsetY)}`;
 }
 
 function resetAlignment(announce = true, remember = true) {
   const baseline = state.baseline || CENTER_FIT_ALIGNMENT;
   restoreAlignment(baseline);
-  state.cardOffsetX = 0;
-  state.cardOffsetY = 0;
+  const profile = activeProfile();
+  if (profile.piece_count > 1) {
+    const [cols, rows] = profile.grid;
+    const [centerX, centerY] = cellCardOffset(profile, Math.floor(cols / 2), Math.floor(rows / 2));
+    state.cardOffsetX = centerX;
+    state.cardOffsetY = centerY;
+  } else {
+    state.cardOffsetX = 0;
+    state.cardOffsetY = 0;
+  }
   syncCardPositionControls();
   if (remember) rememberStableAlignment("user-corrected");
   if (announce) showToast("Artwork fit to the full page.");
@@ -890,37 +914,44 @@ document.querySelectorAll("[data-nudge]").forEach((button) => {
 });
 $("#resetButton").addEventListener("click", () => resetAlignment());
 
-// Card position controls (binders only — UI is hidden otherwise).
+// Card position cell picker (binders only — UI is hidden otherwise).
+// Each of the 9 buttons snaps the original card to that binder cell and the
+// export cutout follows. The on-screen reference chamber stays anchored.
+function setCardCell(col, row) {
+  const profile = activeProfile();
+  if (!profile || !profile.piece_count || profile.piece_count <= 1) return;
+  const [offsetX, offsetY] = cellCardOffset(profile, col, row);
+  state.cardOffsetX = offsetX;
+  state.cardOffsetY = offsetY;
+  syncCardPositionControls();
+  showToast(`Card snapped to ${cellName(col, row)}.`);
+}
 function syncCardPositionControls() {
-  $("#cardOffsetXRange").value = String(Math.round(state.cardOffsetX));
-  $("#cardOffsetYRange").value = String(Math.round(state.cardOffsetY));
-  $("#cardOffsetXOut").textContent = `${Math.round(state.cardOffsetX)} px`;
-  $("#cardOffsetYOut").textContent = `${Math.round(state.cardOffsetY)} px`;
+  const profile = activeProfile();
+  if (!profile) return;
+  const [col, row] = cellFromCardOffset(profile, state.cardOffsetX, state.cardOffsetY);
+  document.querySelectorAll("#cardCellPicker [data-card-cell]").forEach((button) => {
+    const [bcol, brow] = button.dataset.cardCell.split(",").map(Number);
+    const selected = bcol === col && brow === row;
+    button.setAttribute("aria-pressed", selected ? "true" : "false");
+  });
+  const cellLabel = $("#cardCellLabel");
+  if (cellLabel) cellLabel.textContent = cellName(col, row);
+  const cellReadout = $("#cardOffsetValue");
+  if (cellReadout) cellReadout.textContent = `col ${col} / row ${row}`;
   requestRender();
 }
-function nudgeCard(dx, dy, amount = 1) {
-  state.cardOffsetX += dx * amount;
-  state.cardOffsetY += dy * amount;
-  syncCardPositionControls();
-}
-$("#cardOffsetXRange")?.addEventListener("input", (event) => {
-  state.cardOffsetX = Number(event.target.value);
-  syncCardPositionControls();
-});
-$("#cardOffsetYRange")?.addEventListener("input", (event) => {
-  state.cardOffsetY = Number(event.target.value);
-  syncCardPositionControls();
-});
-document.querySelectorAll("[data-card-nudge]").forEach((button) => {
+document.querySelectorAll("#cardCellPicker [data-card-cell]").forEach((button) => {
   button.addEventListener("click", () => {
-    const values = button.dataset.cardNudge.split(",").map(Number);
-    nudgeCard(values[0], values[1], 4);
+    const [col, row] = button.dataset.cardCell.split(",").map(Number);
+    setCardCell(col, row);
   });
 });
 $("#resetCardPosition")?.addEventListener("click", () => {
-  state.cardOffsetX = 0;
-  state.cardOffsetY = 0;
-  syncCardPositionControls();
+  const profile = activeProfile();
+  if (!profile) return;
+  const [cols, rows] = profile.grid;
+  setCardCell(Math.floor(cols / 2), Math.floor(rows / 2));
   showToast("Card position reset to center.");
 });
 

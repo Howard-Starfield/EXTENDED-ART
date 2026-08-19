@@ -176,6 +176,45 @@ export function effectiveCardBox(profile, offsetX = 0, offsetY = 0) {
   return [left, top, left + cardW, top + cardH];
 }
 
+// Returns the [offsetX, offsetY] (in pixels) that would place the original
+// card into a specific cell of a binder. Cell (0, 0) is the top-left cell;
+// the default card position is the centre cell (cols/2 - 0.5, rows/2 - 0.5).
+// Falls back to the centre for non-binder profiles or out-of-range cells.
+export function cellCardOffset(profile, col, row) {
+  if (!profile || !profile.card_box || !profile.grid) return [0, 0];
+  const [cols, rows] = profile.grid;
+  const [masterW, masterH] = profile.master_px;
+  const safeCol = Math.max(0, Math.min(cols - 1, Math.round(col)));
+  const safeRow = Math.max(0, Math.min(rows - 1, Math.round(row)));
+  const offsetX = ((safeCol - (cols - 1) / 2) / cols) * masterW;
+  const offsetY = ((safeRow - (rows - 1) / 2) / rows) * masterH;
+  return [offsetX, offsetY];
+}
+
+// Inverse of cellCardOffset — returns the [col, row] that the given pixel
+// offsets correspond to. Rounds to the nearest cell, clamping to the grid.
+export function cellFromCardOffset(profile, offsetX, offsetY) {
+  if (!profile || !profile.grid) return [1, 1];
+  const [cols, rows] = profile.grid;
+  const [masterW, masterH] = profile.master_px;
+  const col = Math.round((Number(offsetX) / masterW) * cols + (cols - 1) / 2);
+  const row = Math.round((Number(offsetY) / masterH) * rows + (rows - 1) / 2);
+  return [
+    Math.max(0, Math.min(cols - 1, col)),
+    Math.max(0, Math.min(rows - 1, row)),
+  ];
+}
+
+// Human-readable name for a cell, e.g. "Top-Left", "Center", "Bottom-Right".
+const ROW_LABELS = ["Top", "Middle", "Bottom", "Lower"];
+const COL_LABELS = ["Left", "Center", "Right", "Upper"];
+export function cellName(col, row) {
+  const safeCol = Math.max(0, Math.min(COL_LABELS.length - 1, col));
+  const safeRow = Math.max(0, Math.min(ROW_LABELS.length - 1, row));
+  if (safeCol === 1 && safeRow === 1) return "Center";
+  return `${ROW_LABELS[safeRow]}-${COL_LABELS[safeCol]}`;
+}
+
 export function paperFit(profile, paperName, papers = fallbackPapers) {
   if (profile.paper_fit?.[paperName]) return profile.paper_fit[paperName];
   const paper = papers[paperName] || fallbackPapers[paperName];

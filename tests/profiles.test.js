@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   cardPhysicalMm,
+  cellCardOffset,
+  cellFromCardOffset,
+  cellName,
   effectiveCardBox,
   fallbackPapers,
   fallbackProfiles,
@@ -119,5 +122,65 @@ describe("effectiveCardBox", () => {
   it("treats missing piece_count as a single-card profile", () => {
     const profile = { card_box: [0.1, 0.1, 0.2, 0.2], master_px: [1000, 1000] };
     expect(effectiveCardBox(profile, 200, 200)).toEqual([0.1, 0.1, 0.2, 0.2]);
+  });
+});
+
+describe("cellCardOffset / cellFromCardOffset", () => {
+  it("returns zero offset for the centre cell of a 3x3 binder", () => {
+    const profile = fallbackProfiles.standard;
+    expect(cellCardOffset(profile, 1, 1)).toEqual([0, 0]);
+    expect(cellFromCardOffset(profile, 0, 0)).toEqual([1, 1]);
+  });
+
+  it("snaps to one cell horizontally and vertically for the standard profile", () => {
+    const profile = fallbackProfiles.standard;
+    // One cell horizontally = master_px[0] / 3 = 744 px.
+    // One cell vertically = master_px[1] / 3 = 3118/3 ≈ 1039.33 px.
+    const [dx, dy] = cellCardOffset(profile, 2, 0);
+    expect(dx).toBeCloseTo(744, 6);
+    expect(dy).toBeCloseTo(-1039.333, 3);
+  });
+
+  it("respects the larger cell size for the vaultx profile", () => {
+    const profile = fallbackProfiles.vaultx;
+    // vaultx cells are master_px[0]/3 x master_px[1]/3 = 779.667 x 1110.333 px.
+    const [dx, dy] = cellCardOffset(profile, 2, 0);
+    expect(dx).toBeCloseTo(779.667, 3);
+    expect(dy).toBeCloseTo(-1110.333, 3);
+  });
+
+  it("round-trips between cell and offset for every cell of a 3x3 binder", () => {
+    const profile = fallbackProfiles.standard;
+    for (let row = 0; row < 3; row += 1) {
+      for (let col = 0; col < 3; col += 1) {
+        const [ox, oy] = cellCardOffset(profile, col, row);
+        expect(cellFromCardOffset(profile, ox, oy)).toEqual([col, row]);
+      }
+    }
+  });
+
+  it("clamps out-of-range cell coordinates to the grid", () => {
+    const profile = fallbackProfiles.standard;
+    expect(cellCardOffset(profile, 9, 9)).toEqual(cellCardOffset(profile, 2, 2));
+    expect(cellCardOffset(profile, -3, -3)).toEqual(cellCardOffset(profile, 0, 0));
+  });
+
+  it("falls back to the centre cell for non-binder profiles", () => {
+    const psa = fallbackProfiles.psa;
+    // PSA is a 1x1 grid, so the only valid cell is (0, 0).
+    expect(cellCardOffset(psa, 0, 0)).toEqual([0, 0]);
+    expect(cellFromCardOffset(psa, 999, -999)).toEqual([0, 0]);
+  });
+
+  it("names each of the 9 cells of a 3x3 binder", () => {
+    expect(cellName(0, 0)).toBe("Top-Left");
+    expect(cellName(1, 0)).toBe("Top-Center");
+    expect(cellName(2, 0)).toBe("Top-Right");
+    expect(cellName(0, 1)).toBe("Middle-Left");
+    expect(cellName(1, 1)).toBe("Center");
+    expect(cellName(2, 1)).toBe("Middle-Right");
+    expect(cellName(0, 2)).toBe("Bottom-Left");
+    expect(cellName(1, 2)).toBe("Bottom-Center");
+    expect(cellName(2, 2)).toBe("Bottom-Right");
   });
 });

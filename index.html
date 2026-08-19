@@ -247,24 +247,27 @@
       </div>
 
       <div class="control-block card-position-controls" id="cardPositionControls" hidden>
-        <div class="card-position-heading"><strong>Card position</strong><span>Shift the original card zone</span></div>
-        <div class="card-position-sliders">
-          <label for="cardOffsetXRange"><span>X offset</span><output id="cardOffsetXOut">0 px</output></label>
-          <input id="cardOffsetXRange" type="range" min="-744" max="744" value="0" step="1">
-          <label for="cardOffsetYRange"><span>Y offset</span><output id="cardOffsetYOut">0 px</output></label>
-          <input id="cardOffsetYRange" type="range" min="-744" max="744" value="0" step="1">
+        <div class="card-position-heading"><strong>Card position</strong><span>Pick the cell for the original card</span></div>
+        <div class="card-position-cells" id="cardCellPicker" role="grid" aria-label="Card cell">
+          <button type="button" data-card-cell="0,0" aria-label="Top-left cell" role="gridcell">&UpperLeft;</button>
+          <button type="button" data-card-cell="1,0" aria-label="Top-center cell" role="gridcell">&uarr;</button>
+          <button type="button" data-card-cell="2,0" aria-label="Top-right cell" role="gridcell">&UpperRight;</button>
+          <button type="button" data-card-cell="0,1" aria-label="Middle-left cell" role="gridcell">&larr;</button>
+          <button type="button" data-card-cell="1,1" aria-label="Center cell" role="gridcell">&middot;</button>
+          <button type="button" data-card-cell="2,1" aria-label="Middle-right cell" role="gridcell">&rarr;</button>
+          <button type="button" data-card-cell="0,2" aria-label="Bottom-left cell" role="gridcell">&LowerLeft;</button>
+          <button type="button" data-card-cell="1,2" aria-label="Bottom-center cell" role="gridcell">&darr;</button>
+          <button type="button" data-card-cell="2,2" aria-label="Bottom-right cell" role="gridcell">&LowerRight;</button>
         </div>
-        <div class="card-position-nudge">
-          <label><span>Card nudge</span><output id="cardOffsetValue">X 0 / Y 0</output></label>
-          <div class="nudge-pad">
-            <button type="button" data-card-nudge="0,-1" aria-label="Move card up">&uarr;</button>
-            <button type="button" data-card-nudge="-1,0" aria-label="Move card left">&larr;</button>
-            <button type="button" id="resetCardPosition" aria-label="Reset card position">C</button>
-            <button type="button" data-card-nudge="1,0" aria-label="Move card right">&rarr;</button>
-            <button type="button" data-card-nudge="0,1" aria-label="Move card down">&darr;</button>
-          </div>
+        <div class="card-position-label">
+          Position: <strong id="cardCellLabel">Center</strong>
         </div>
-        <small class="dimension-hint">Drag sliders or use nudge buttons to shift the card zone to any cell.</small>
+        <div class="card-position-readout">
+          <span>Cell</span>
+          <output id="cardOffsetValue">col 1 / row 1</output>
+        </div>
+        <button type="button" class="card-position-reset" id="resetCardPosition" aria-label="Reset card position to center">Reset to center</button>
+        <small class="dimension-hint">Pick any of the 9 cells. The original card and the print cutout both follow the picked cell; the centre blue frame stays as the default-placement reference.</small>
       </div>
 
       <div class="control-block nudge-block">
