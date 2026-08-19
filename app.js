@@ -181,6 +181,7 @@ function updateStudioContract() {
       ? "White centered card chamber with dotted guide"
       : "Finished outer pieces with cut guides";
   $("#psaLabelControls").hidden = profile.name !== "psa" && profile.name !== "psaMini";
+  $("#cardPositionControls").hidden = !profile.piece_count || profile.piece_count <= 1;
   updatePaperTools();
   updateExportSummary();
   updateQualityNotice();
@@ -820,11 +821,15 @@ function render() {
   const xPixels = Math.round(state.offsetX * profile.master_px[0]);
   const yPixels = Math.round(state.offsetY * profile.master_px[1]);
   $("#offsetValue").textContent = `X ${xPixels} / Y ${yPixels}`;
+  $("#cardOffsetValue").textContent = `X ${Math.round(state.cardOffsetX)} / Y ${Math.round(state.cardOffsetY)}`;
 }
 
 function resetAlignment(announce = true, remember = true) {
   const baseline = state.baseline || CENTER_FIT_ALIGNMENT;
   restoreAlignment(baseline);
+  state.cardOffsetX = 0;
+  state.cardOffsetY = 0;
+  syncCardPositionControls();
   if (remember) rememberStableAlignment("user-corrected");
   if (announce) showToast("Artwork fit to the full page.");
 }
@@ -884,6 +889,40 @@ document.querySelectorAll("[data-nudge]").forEach((button) => {
   });
 });
 $("#resetButton").addEventListener("click", () => resetAlignment());
+
+// Card position controls (binders only — UI is hidden otherwise).
+function syncCardPositionControls() {
+  $("#cardOffsetXRange").value = String(Math.round(state.cardOffsetX));
+  $("#cardOffsetYRange").value = String(Math.round(state.cardOffsetY));
+  $("#cardOffsetXOut").textContent = `${Math.round(state.cardOffsetX)} px`;
+  $("#cardOffsetYOut").textContent = `${Math.round(state.cardOffsetY)} px`;
+  requestRender();
+}
+function nudgeCard(dx, dy, amount = 1) {
+  state.cardOffsetX += dx * amount;
+  state.cardOffsetY += dy * amount;
+  syncCardPositionControls();
+}
+$("#cardOffsetXRange")?.addEventListener("input", (event) => {
+  state.cardOffsetX = Number(event.target.value);
+  syncCardPositionControls();
+});
+$("#cardOffsetYRange")?.addEventListener("input", (event) => {
+  state.cardOffsetY = Number(event.target.value);
+  syncCardPositionControls();
+});
+document.querySelectorAll("[data-card-nudge]").forEach((button) => {
+  button.addEventListener("click", () => {
+    const values = button.dataset.cardNudge.split(",").map(Number);
+    nudgeCard(values[0], values[1], 4);
+  });
+});
+$("#resetCardPosition")?.addEventListener("click", () => {
+  state.cardOffsetX = 0;
+  state.cardOffsetY = 0;
+  syncCardPositionControls();
+  showToast("Card position reset to center.");
+});
 
 $("#zoomRange").addEventListener("input", (event) => {
   if (state.alignmentBusy) return;

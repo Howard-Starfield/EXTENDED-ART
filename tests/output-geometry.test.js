@@ -70,4 +70,26 @@ describe("cutout and guide geometry", () => {
     expect(internal.x).toBeGreaterThan(rect.x);
     expect(internal.x + internal.width).toBeLessThan(rect.x + rect.width);
   });
+
+  it("shifts the binder center-card cutout when a card offset is provided", () => {
+    const profile = fallbackProfiles.standard;
+    const baseline = getOutputMaskGeometry(profile)[0].pixels;
+    const offset = getOutputMaskGeometry(profile, { cardOffsetX: 744, cardOffsetY: 0 })[0].pixels;
+    // Width and height of the cutout must stay the same.
+    expect(offset.width).toBe(baseline.width);
+    expect(offset.height).toBe(baseline.height);
+    // But the cutout has slid by one cell to the right (744 px at 300 DPI).
+    expect(offset.x - baseline.x).toBe(744);
+  });
+
+  it("ignores the card offset for non-binder profiles", () => {
+    const psa = fallbackProfiles.psa;
+    const baseline = getOutputMaskGeometry(psa, { labelBox: psaLabelBox(psa, 69.85, 21.59) })[1].pixels;
+    const offset = getOutputMaskGeometry(psa, {
+      labelBox: psaLabelBox(psa, 69.85, 21.59),
+      cardOffsetX: 500,
+      cardOffsetY: 500,
+    })[1].pixels;
+    expect(offset).toEqual(baseline);
+  });
 });

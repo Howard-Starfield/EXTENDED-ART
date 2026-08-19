@@ -1,4 +1,4 @@
-import { isSlabProfile } from "./profiles.js";
+import { effectiveCardBox, isSlabProfile } from "./profiles.js";
 
 export const GUIDE_CLEARANCE_PT = 0.25;
 export const GUIDE_STROKE_PT = 0.5;
@@ -45,18 +45,26 @@ export function internalGuideRect(rect, options = {}) {
 
 export function getCutoutGeometry(
   profile,
-  { labelBox = profile.label_box, cornerRadiusMm = profile.recommended_corner_radius_mm || 0 } = {},
+  {
+    labelBox = profile.label_box,
+    cornerRadiusMm = profile.recommended_corner_radius_mm || 0,
+    cardOffsetX = 0,
+    cardOffsetY = 0,
+  } = {},
 ) {
   const cutouts = [];
   if ((profile.name === "psa" || profile.name === "psaMini") && labelBox) {
     cutouts.push({ id: "PSA_LABEL", label: "PSA LABEL CUTOUT", box: labelBox, radiusMm: cornerRadiusMm });
   }
-  if (isSlabProfile(profile)) {
-    cutouts.push({ id: "CARD", label: "CARD CUTOUT", box: profile.card_box, radiusMm: cornerRadiusMm });
-  } else if (profile.name === "photo8x10") {
-    cutouts.push({ id: "CARD", label: "CARD CHAMBER", box: profile.card_box, radiusMm: cornerRadiusMm });
-  } else if (profile.grid?.[0] === 3 && profile.grid?.[1] === 3) {
-    cutouts.push({ id: "CENTER_CARD", label: "CENTER CARD", box: profile.card_box, radiusMm: cornerRadiusMm });
+  if (isSlabProfile(profile) || profile.name === "photo8x10" || (profile.grid?.[0] === 3 && profile.grid?.[1] === 3)) {
+    const cardBox = effectiveCardBox(profile, cardOffsetX, cardOffsetY);
+    if (isSlabProfile(profile)) {
+      cutouts.push({ id: "CARD", label: "CARD CUTOUT", box: cardBox, radiusMm: cornerRadiusMm });
+    } else if (profile.name === "photo8x10") {
+      cutouts.push({ id: "CARD", label: "CARD CHAMBER", box: cardBox, radiusMm: cornerRadiusMm });
+    } else {
+      cutouts.push({ id: "CENTER_CARD", label: "CENTER CARD", box: cardBox, radiusMm: cornerRadiusMm });
+    }
   }
   return cutouts;
 }

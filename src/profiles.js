@@ -162,6 +162,20 @@ export function cardPhysicalMm(profile) {
   ];
 }
 
+// Returns the card box shifted by the user-selected X/Y pixel offset.
+// Only binders (piece_count > 1) honour the offset; single-card profiles
+// (psa, psaMini, psaCase, cardslab, photo8x10) always return the original
+// card_box because there is no other cell for the card to occupy.
+export function effectiveCardBox(profile, offsetX = 0, offsetY = 0) {
+  if (!profile || !profile.card_box) return profile?.card_box;
+  if (!profile.piece_count || profile.piece_count <= 1) return profile.card_box;
+  const cardW = profile.card_box[2] - profile.card_box[0];
+  const cardH = profile.card_box[3] - profile.card_box[1];
+  const left = profile.card_box[0] + offsetX / profile.master_px[0];
+  const top = profile.card_box[1] + offsetY / profile.master_px[1];
+  return [left, top, left + cardW, top + cardH];
+}
+
 export function paperFit(profile, paperName, papers = fallbackPapers) {
   if (profile.paper_fit?.[paperName]) return profile.paper_fit[paperName];
   const paper = papers[paperName] || fallbackPapers[paperName];

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   cardPhysicalMm,
+  effectiveCardBox,
   fallbackPapers,
   fallbackProfiles,
   paperFit,
@@ -79,5 +80,44 @@ describe("print profile contracts", () => {
   it("shows when Vault Letter needs exact two-page handling", () => {
     const fit = paperFit(fallbackProfiles.vaultx, "letter", fallbackPapers);
     expect(fit.scale).toBeLessThan(1);
+  });
+});
+
+describe("effectiveCardBox", () => {
+  it("returns the original card_box when offset is zero on a binder", () => {
+    const profile = fallbackProfiles.standard;
+    expect(effectiveCardBox(profile, 0, 0)).toEqual(profile.card_box);
+  });
+
+  it("shifts the binder card box by the requested pixel offset", () => {
+    const profile = fallbackProfiles.standard;
+    const offsetX = 744; // one cell wide
+    const offsetY = 1039; // one cell tall
+    const result = effectiveCardBox(profile, offsetX, offsetY);
+    // Left should move by one cell width.
+    expect(result[0] - profile.card_box[0]).toBeCloseTo(offsetX / profile.master_px[0], 8);
+    expect(result[1] - profile.card_box[1]).toBeCloseTo(offsetY / profile.master_px[1], 8);
+    // Card size is preserved.
+    expect(result[2] - result[0]).toBeCloseTo(profile.card_box[2] - profile.card_box[0], 8);
+    expect(result[3] - result[1]).toBeCloseTo(profile.card_box[3] - profile.card_box[1], 8);
+  });
+
+  it("ignores the offset for single-card profiles", () => {
+    const psa = fallbackProfiles.psa;
+    const original = [...psa.card_box];
+    const result = effectiveCardBox(psa, 999, -999);
+    expect(result).toEqual(original);
+  });
+
+  it("ignores the offset for the photo frame profile", () => {
+    const photo = fallbackProfiles.photo8x10;
+    const original = [...photo.card_box];
+    const result = effectiveCardBox(photo, 500, 500);
+    expect(result).toEqual(original);
+  });
+
+  it("treats missing piece_count as a single-card profile", () => {
+    const profile = { card_box: [0.1, 0.1, 0.2, 0.2], master_px: [1000, 1000] };
+    expect(effectiveCardBox(profile, 200, 200)).toEqual([0.1, 0.1, 0.2, 0.2]);
   });
 });

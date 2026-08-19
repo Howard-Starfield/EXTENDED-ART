@@ -1,6 +1,6 @@
 import { imageSize } from "./state.js";
 import { getCutoutGeometry, internalGuideRect, normalizedBoxToPixels } from "./output-geometry.js";
-import { isSingleDisplayProfile } from "./profiles.js";
+import { effectiveCardBox, isSingleDisplayProfile } from "./profiles.js";
 
 export function roundedRectPath(context, x, y, width, height, radius) {
   const r = Math.max(0, Math.min(radius, width / 2, height / 2));
@@ -59,21 +59,24 @@ export function drawAlignmentScene({ context, width, height, profile, state, art
   const cellW = width / columns;
   const cellH = height / rows;
   const pieceRadius = (state.cornerRadiusMm / profile.insert_mm[0]) * cellW;
-  const cardX = profile.card_box[0] * width;
-  const cardY = profile.card_box[1] * height;
-  const cardW = (profile.card_box[2] - profile.card_box[0]) * width;
-  const cardH = (profile.card_box[3] - profile.card_box[1]) * height;
-  const cardWidthMm = profile.master_mm[0] * (profile.card_box[2] - profile.card_box[0]);
+  const cardBox = effectiveCardBox(profile, state.cardOffsetX, state.cardOffsetY);
+  const cardX = cardBox[0] * width;
+  const cardY = cardBox[1] * height;
+  const cardW = (cardBox[2] - cardBox[0]) * width;
+  const cardH = (cardBox[3] - cardBox[1]) * height;
+  const cardWidthMm = profile.master_mm[0] * (cardBox[2] - cardBox[0]);
   const cardRadius = (state.cornerRadiusMm / cardWidthMm) * cardW;
 
   if (cardImage && state.showCard) {
-    drawCardReference(context, cardImage, profile.card_box, width, height, cardRadius, state.opacity, state.difference);
+    drawCardReference(context, cardImage, cardBox, width, height, cardRadius, state.opacity, state.difference);
   }
 
   if (artImage && isSingleDisplayProfile(profile)) {
     const cutouts = getCutoutGeometry(profile, {
       labelBox,
       cornerRadiusMm: state.cornerRadiusMm,
+      cardOffsetX: state.cardOffsetX,
+      cardOffsetY: state.cardOffsetY,
     }).filter((cutout) => !(cutout.id === "CARD" && includeCard));
     context.save();
     for (const cutout of cutouts) {

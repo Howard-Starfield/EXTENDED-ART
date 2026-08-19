@@ -113,6 +113,8 @@ export function createInitialState(profiles, papers) {
     zoom: 1,
     offsetX: 0,
     offsetY: 0,
+    cardOffsetX: 0,
+    cardOffsetY: 0,
     opacity: 0.72,
     cornerRadiusMm: 3,
     psaLabelWidthMm: 69.85,

@@ -246,6 +246,27 @@
         <small class="dimension-hint">2.75 × 0.85 in · 825 × 255 px at 300 DPI</small>
       </div>
 
+      <div class="control-block card-position-controls" id="cardPositionControls" hidden>
+        <div class="card-position-heading"><strong>Card position</strong><span>Shift the original card zone</span></div>
+        <div class="card-position-sliders">
+          <label for="cardOffsetXRange"><span>X offset</span><output id="cardOffsetXOut">0 px</output></label>
+          <input id="cardOffsetXRange" type="range" min="-744" max="744" value="0" step="1">
+          <label for="cardOffsetYRange"><span>Y offset</span><output id="cardOffsetYOut">0 px</output></label>
+          <input id="cardOffsetYRange" type="range" min="-744" max="744" value="0" step="1">
+        </div>
+        <div class="card-position-nudge">
+          <label><span>Card nudge</span><output id="cardOffsetValue">X 0 / Y 0</output></label>
+          <div class="nudge-pad">
+            <button type="button" data-card-nudge="0,-1" aria-label="Move card up">&uarr;</button>
+            <button type="button" data-card-nudge="-1,0" aria-label="Move card left">&larr;</button>
+            <button type="button" id="resetCardPosition" aria-label="Reset card position">C</button>
+            <button type="button" data-card-nudge="1,0" aria-label="Move card right">&rarr;</button>
+            <button type="button" data-card-nudge="0,1" aria-label="Move card down">&darr;</button>
+          </div>
+        </div>
+        <small class="dimension-hint">Drag sliders or use nudge buttons to shift the card zone to any cell.</small>
+      </div>
+
       <div class="control-block nudge-block">
         <label><span>Precision nudge</span><output id="offsetValue">X 0 / Y 0</output></label>
         <div class="nudge-pad">

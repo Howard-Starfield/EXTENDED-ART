@@ -459,6 +459,24 @@ input[type="range"]::-webkit-slider-thumb {
 .nudge-pad [data-nudge="1,0"] { grid-area: right; }
 .nudge-pad [data-nudge="0,1"] { grid-area: down; }
 #resetButton { grid-area: reset; color: var(--coral); }
+.nudge-pad [data-card-nudge="0,-1"] { grid-area: up; }
+.nudge-pad [data-card-nudge="-1,0"] { grid-area: left; }
+.nudge-pad [data-card-nudge="1,0"] { grid-area: right; }
+.nudge-pad [data-card-nudge="0,1"] { grid-area: down; }
+.nudge-pad #resetCardPosition { grid-area: reset; color: var(--coral); }
+.card-position-controls[hidden] { display: none; }
+.card-position-controls { border-top: 1px solid rgba(23,27,29,.12); padding-top: 10px; margin-top: 4px; }
+.card-position-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+.card-position-heading strong { font-size: 10px; }
+.card-position-heading span { color: var(--coral); font: 7px/1 "Cascadia Mono", monospace; text-transform: uppercase; }
+.card-position-sliders { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 8px; margin-bottom: 8px; }
+.card-position-sliders label { display: flex; justify-content: space-between; align-items: center; margin: 0; font-size: 9px; }
+.card-position-sliders label output { color: var(--cyan-dark); font: 9px/1 "Cascadia Mono", monospace; }
+.card-position-sliders input[type="range"] { grid-column: 1 / -1; accent-color: var(--coral); }
+.card-position-nudge { margin-top: 4px; }
+.card-position-nudge > label { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+.card-position-nudge > label span { font-size: 9px; }
+.card-position-nudge > label output { color: var(--cyan-dark); font: 9px/1 "Cascadia Mono", monospace; }
 .check-row {
   display: flex; gap: 9px; align-items: flex-start; margin: 8px 0; cursor: pointer;
 }
