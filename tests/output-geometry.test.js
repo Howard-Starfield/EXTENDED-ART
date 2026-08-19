@@ -82,6 +82,20 @@ describe("cutout and guide geometry", () => {
     expect(offset.x - baseline.x).toBe(744);
   });
 
+  it("lets the on-screen reference chamber stay at the default center by omitting the offset", () => {
+    // Mirrors the renderer contract: drawAlignmentScene calls getCutoutGeometry
+    // without cardOffsetX/Y so the white chamber keeps marking the "default"
+    // placement even after the user nudges the card to a different cell.
+    const profile = fallbackProfiles.standard;
+    const withOffset = getOutputMaskGeometry(profile, { cardOffsetX: 744, cardOffsetY: 0 })[0].pixels;
+    const withoutOffset = getOutputMaskGeometry(profile)[0].pixels;
+    expect(withoutOffset.x).toBe(withOffset.x - 744);
+    expect(withoutOffset.y).toBe(withOffset.y);
+    // Size is identical — only the position differs.
+    expect(withoutOffset.width).toBe(withOffset.width);
+    expect(withoutOffset.height).toBe(withOffset.height);
+  });
+
   it("ignores the card offset for non-binder profiles", () => {
     const psa = fallbackProfiles.psa;
     const baseline = getOutputMaskGeometry(psa, { labelBox: psaLabelBox(psa, 69.85, 21.59) })[1].pixels;
