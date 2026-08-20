@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fallbackProfiles, psaLabelBox } from "../src/profiles.js";
+import { cellCardOffset, fallbackProfiles, psaLabelBox } from "../src/profiles.js";
 import {
   getCutoutGeometry,
   getOutputMaskGeometry,
@@ -94,6 +94,33 @@ describe("cutout and guide geometry", () => {
     expect(offset.height).toBe(baseline.height);
     // The cutout slid by one cell to the right (744 px at 300 DPI).
     expect(offset.x - baseline.x).toBe(744);
+  });
+
+  it("translates the binder card cutout onto a sub-piece instead of scaling it", () => {
+    // The picked cell's piece is one 1/3-sized sub-piece of the master, so
+    // when the cutout lands on it, the mask must cover the WHOLE piece
+    // (translated to the piece's local coords), not a scaled-down sliver.
+    // Regression test for the "mini version" bug where applyCutoutMasks
+    // scaled cutout coords by piece/master instead of translating them.
+    const profile = fallbackProfiles.standard; // 3x3 binder, piece = 744 x 1039
+    const piece = { column: 1, row: 0, source: { x: 744, y: 0 } };
+    const cutout = getOutputMaskGeometry(profile, {
+      cardOffsetX: cellCardOffset(profile, 1, 0)[0],
+      cardOffsetY: cellCardOffset(profile, 1, 0)[1],
+    })[0];
+    // The cutout covers the top-center cell in the master.
+    expect(cutout.pixels.x).toBe(744);
+    expect(cutout.pixels.y).toBe(0);
+    // In the piece's local coords the cutout must be the whole piece
+    // (translated, not scaled):
+    //   rect.x = cutout.pixels.x - piece.source.x = 0
+    //   rect.y = cutout.pixels.y - piece.source.y = 0
+    //   rect.width = cutout.pixels.width  (= 744)
+    //   rect.height = cutout.pixels.height (= 1039)
+    expect(cutout.pixels.x - piece.source.x).toBe(0);
+    expect(cutout.pixels.y - piece.source.y).toBe(0);
+    expect(cutout.pixels.width).toBe(744);
+    expect(cutout.pixels.height).toBe(1039);
   });
 
   it("ignores the card offset for non-binder profiles", () => {

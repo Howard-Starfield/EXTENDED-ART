@@ -38,8 +38,12 @@ function ensureNotAborted(signal) {
   if (signal?.aborted) throw new DOMException("Package export cancelled.", "AbortError");
 }
 
-function cardCanvas({ profile, cardImage, documentRef }) {
-  const cardCutout = getOutputMaskGeometry(profile).find((cutout) => cutout.id === "CARD");
+function cardCanvas({ profile, cardImage, documentRef, cardOffsetX = 0, cardOffsetY = 0 }) {
+  // Size the embedded card image to the cutout at the *picked* cell, not
+  // the default centre. Without the offset, a custom-pick would still embed
+  // a centre-sized image that looks "mini" when placed on a non-centre cell.
+  const cutouts = getOutputMaskGeometry(profile, { cardOffsetX, cardOffsetY });
+  const cardCutout = cutouts.find((cutout) => cutout.id === "CARD" || cutout.id === "CENTER_CARD");
   const width = cardCutout?.pixels.width || profile.insert_px[0];
   const height = cardCutout?.pixels.height || profile.insert_px[1];
   const canvas = documentRef.createElement("canvas");
@@ -194,7 +198,7 @@ export async function createBrowserPrintPackage({
     }
     onProgress?.({ stage: "Rendering printable pieces", completedWork: index + 1, totalWork: pieceGeometry.length, progress: 10 + ((index + 1) / pieceGeometry.length) * 40 });
   }
-  const cardCanvasElement = cardCanvas({ profile, cardImage: state.cardImage, documentRef });
+  const cardCanvasElement = cardCanvas({ profile, cardImage: state.cardImage, documentRef, cardOffsetX, cardOffsetY });
   const cardPng = await canvasPng(cardCanvasElement);
   releaseCanvas(cardCanvasElement);
   const slug = safeSlug(state.artFile?.name);
