@@ -382,6 +382,8 @@ function render() {
   const cellW = width / columns;
   const cellH = height / rows;
   const pieceRadius = (state.cornerRadiusMm / profile.insert_mm[0]) * cellW;
+  // The card image, the on-screen chamber, and the cyan stroke all follow
+  // the user's picked cell. The export cutout follows the same offset.
   const cardBox = effectiveCardBox();
   const cardX = cardBox[0] * width;
   const cardY = cardBox[1] * height;
@@ -447,6 +449,8 @@ function render() {
         ctx.stroke();
       }
     }
+    // The cyan stroke is the "card position" outline — it follows the
+    // user's picked cell so the on-screen preview matches the print.
     ctx.strokeStyle = state.difference ? "#f4d34d" : "#2aa9b8";
     ctx.lineWidth = 2;
     roundedRectPath(ctx, cardX + 1, cardY + 1, cardWBox - 2, cardHBox - 2, cardRadius);
