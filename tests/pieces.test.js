@@ -21,28 +21,29 @@ describe("deterministic output pieces", () => {
       "TL", "TC", "TR", "ML", "MR", "BL", "BC", "BR",
     ]);
     expect(all.map((piece) => piece.source.height)).toEqual([
-      1039, 1039, 1039,
-      1040, 1040, 1040,
-      1039, 1039, 1039,
+      1075, 1075, 1075,
+      1074, 1074, 1074,
+      1075, 1075, 1075,
     ]);
-    expect(all.every((piece) => piece.output.width === 744 && piece.output.height === 1039)).toBe(true);
+    expect(all.map((piece) => piece.source.width)).toEqual([780, 779, 780, 780, 779, 780, 780, 779, 780]);
+    expect(all.every((piece) => piece.output.width === 780 && piece.output.height === 1075)).toBe(true);
   });
 
   it("keeps Vault source rounding independent from canonical piece dimensions", () => {
     const all = getPieceGeometry(fallbackProfiles.vaultx);
-    expect(all.map((piece) => piece.source.width)).toEqual([780, 779, 780, 780, 779, 780, 780, 779, 780]);
     expect(all.map((piece) => piece.source.height)).toEqual([
-      1110, 1110, 1110,
-      1111, 1111, 1111,
-      1110, 1110, 1110,
+      1146, 1146, 1146,
+      1145, 1145, 1145,
+      1146, 1146, 1146,
     ]);
-    expect(all.every((piece) => piece.output.width === 780 && piece.output.height === 1110)).toBe(true);
+    expect(all.map((piece) => piece.source.width)).toEqual([803, 803, 803, 803, 803, 803, 803, 803, 803]);
+    expect(all.every((piece) => piece.output.width === 803 && piece.output.height === 1146)).toBe(true);
   });
 
   it("keeps corner masks in physical pixels without changing piece boxes", () => {
     expect(mmToPixels(3)).toBeCloseTo(35.433, 3);
     expect(roundedMaskRadiusPx(fallbackProfiles.standard, 3)).toBeCloseTo(mmToPixels(3), 6);
-    expect(roundedMaskRadiusPx(fallbackProfiles.standard, 99)).toBeCloseTo(mmToPixels(31.5), 6);
+    expect(roundedMaskRadiusPx(fallbackProfiles.standard, 99)).toBeCloseTo(mmToPixels(33), 6);
   });
 
   it("applies an alpha mask after the piece box is established", () => {
@@ -57,15 +58,15 @@ describe("deterministic output pieces", () => {
       moveTo: () => calls.push("moveTo"),
       arcTo: () => calls.push("arcTo"),
       closePath: () => calls.push("closePath"),
-      fill: () => calls.push({ operation: context.globalCompositeOperation, width: 744, height: 1039 }),
+      fill: () => calls.push({ operation: context.globalCompositeOperation, width: 780, height: 1075 }),
       globalCompositeOperation: "source-over",
       globalAlpha: 0,
       fillStyle: "",
     };
 
-    applyRoundedAlphaMask(context, 744, 1039, 35.433);
+    applyRoundedAlphaMask(context, 780, 1075, 35.433);
 
-    expect(calls).toContainEqual({ operation: "destination-in", width: 744, height: 1039 });
+    expect(calls).toContainEqual({ operation: "destination-in", width: 780, height: 1075 });
     expect(calls[0]).toBe("save");
     expect(calls.at(-1)).toBe("restore");
     expect(context.globalCompositeOperation).toBe("source-over");
@@ -85,13 +86,10 @@ describe("deterministic output pieces", () => {
     }
   });
 
-  it("translates the cutout to fill the entire picked cell for every binder position", () => {
-    // Regression test for the "mini version" cutout bug: previously
-    // applyCutoutMasks scaled the cutout's master-space coords by
-    // pieceWidth / masterWidth instead of translating by pieceSource,
-    // which produced a 1/9-sized sliver in the corner of the picked piece.
-    // For every cell, the cutout rect (in piece coords) must cover the
-    // entire piece — off by at most a couple of pixels of rounding.
+  it("translates the standard card cutout into every picked pocket cell", () => {
+    // The pocket tile is intentionally larger than the physical 63 x 88 mm
+    // card. The cutout must translate with the picked cell while preserving
+    // the card-sized opening and its centered margin inside that tile.
     for (const name of ["standard", "vaultx"]) {
       const profile = fallbackProfiles[name];
       const geom = getPieceGeometry(profile);
@@ -111,15 +109,12 @@ describe("deterministic output pieces", () => {
             width: cut.pixels.width,
             height: cut.pixels.height,
           };
-          // Allow ±2px rounding tolerance from millimetre → pixel conversion
-          // (the cutout is derived from master_mm, the piece from master_px,
-          // and the two don't perfectly agree at the bottom edge — 1px = 0.0085mm)
-          expect(rect.x).toBeGreaterThanOrEqual(-2);
-          expect(rect.x).toBeLessThanOrEqual(2);
-          expect(rect.y).toBeGreaterThanOrEqual(-2);
-          expect(rect.y).toBeLessThanOrEqual(2);
-          expect(Math.abs(rect.width - piece.source.width)).toBeLessThanOrEqual(2);
-          expect(Math.abs(rect.height - piece.source.height)).toBeLessThanOrEqual(2);
+          const expectedX = (profile.insert_px[0] - 744) / 2;
+          const expectedY = (profile.insert_px[1] - 1039) / 2;
+          expect(Math.abs(rect.x - expectedX)).toBeLessThanOrEqual(1);
+          expect(Math.abs(rect.y - expectedY)).toBeLessThanOrEqual(1);
+          expect(rect.width).toBe(744);
+          expect(rect.height).toBe(1039);
         }
       }
     }

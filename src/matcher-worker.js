@@ -267,7 +267,7 @@ function postFailure(jobId, profileVersion, error) {
 
 async function runMatch(message) {
   const jobId = message.job_id;
-  const profileVersion = message.profile_version || "phase2-profiles-1";
+  const profileVersion = message.profile_version || "phase2-profiles-2";
   currentStageKey = "start";
   progress(jobId, profileVersion, "prepare-art", "Preparing artwork pixels", 0, 1, 5);
   const art = rasterize(message.art_image);
@@ -348,7 +348,7 @@ self.onmessage = async (event) => {
   }
   if (message.type !== "match") return;
   const jobId = message.job_id;
-  const profileVersion = message.profile_version || "phase2-profiles-1";
+  const profileVersion = message.profile_version || "phase2-profiles-2";
   if (activeJobId !== null && activeJobId !== jobId) {
     postFailure(jobId, profileVersion, matcherError(FAILED, "start", "The worker is already processing another matcher job."));
     return;

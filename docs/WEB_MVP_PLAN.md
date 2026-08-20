@@ -104,8 +104,8 @@ the current Python reference silently scales a cut-ready page or centers an
 internal guide on retained artwork, this contract is the correction and the
 reference fixture must be updated before parity is claimed:
 
-- Standard master: `2232 × 3118 px`; insert: `744 × 1039 px`.
-- Vault master: `2339 × 3331 px`; insert: `780 × 1110 px`.
+- Standard master: `2339 × 3224 px`; insert: `780 × 1075 px`; centered card: `63 × 88 mm`.
+- Vault master: `2409 × 3437 px`; insert: `803 × 1146 px`; centered card: `63 × 88 mm`.
 - PSA master/insert: `948 × 1596 px`.
 - Photo frame master/insert: `2400 × 3000 px`.
 - PSA default label cutout: `69.85 × 21.59 mm` at `5.0 mm` from the top.

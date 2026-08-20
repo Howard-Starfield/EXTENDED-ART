@@ -8,7 +8,7 @@ const matched = {
   status: "MATCHED",
   accepted: true,
   matcherVersion: "phase2.1",
-  profileVersion: "phase2-profiles-1",
+  profileVersion: "phase2-profiles-2",
   bestScore: 0.91,
   secondScore: 0.72,
   scoreMargin: 0.19,
@@ -23,7 +23,7 @@ describe("quality report contract", () => {
     const report = buildQualityReport({
       profile,
       paper: fallbackPapers.a4,
-      artDimensions: { width: 2232, height: 3118 },
+      artDimensions: { width: 2339, height: 3224 },
       cardDimensions: { width: 744, height: 1039 },
       alignment: matched,
       exportOptions: { includePieces: false, includeMaster: false },
@@ -31,12 +31,12 @@ describe("quality report contract", () => {
 
     expect(report.overallStatus).toBe("PASS");
     expect(report.reportVersion).toBe("alignment-v4.0");
-    expect(report.profileVersion).toBe("phase2-profiles-1");
+    expect(report.profileVersion).toBe("phase2-profiles-2");
     expect(report.alignment.status).toBe("MATCH_APPLIED");
     expect(report.alignment.statusVersion).toBe("alignment-v4.0");
     expect(report.alignment.matcherVersion).toBe("phase2.1");
     expect(report.alignment.evidence[0]).toContain("cleared");
-    expect(report.target.masterPx).toEqual([2232, 3118]);
+    expect(report.target.masterPx).toEqual([2339, 3224]);
     expect(report.cutouts[0].id).toBe("CENTER_CARD");
   });
 
@@ -69,7 +69,7 @@ describe("quality report contract", () => {
     const report = buildQualityReport({
       profile: fallbackProfiles.standard,
       paper: fallbackPapers.a4,
-      artDimensions: { width: 2232, height: 3118 },
+      artDimensions: { width: 2339, height: 3224 },
       cardDimensions: { width: 744, height: 1039 },
       alignment: {
         status: "TIMED_OUT",
@@ -90,7 +90,7 @@ describe("quality report contract", () => {
     const report = buildQualityReport({
       profile: fallbackProfiles.standard,
       paper: fallbackPapers.a4,
-      artDimensions: { width: 2232, height: 3118 },
+      artDimensions: { width: 2339, height: 3224 },
       cardDimensions: { width: 744, height: 1039 },
       alignment: {
         status: "FAILED",

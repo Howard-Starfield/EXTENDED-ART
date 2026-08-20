@@ -25,7 +25,7 @@ export const MATCHER_STAGES = Object.freeze({
   ERROR: `${MATCHER_TRANSPORT_VERSION}:error`,
 });
 
-const DEFAULT_PROFILE_VERSION = "phase2-profiles-1";
+const DEFAULT_PROFILE_VERSION = "phase2-profiles-2";
 const TERMINAL_RESULT_STATUSES = new Set(Object.values(MATCHER_STATUSES));
 
 function defaultWorkerFactory() {

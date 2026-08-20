@@ -11,8 +11,8 @@ describe("exact page layout contract", () => {
       "TL", "TC", "TR", "ML", "MR", "BL", "BC", "BR",
     ]);
     expect(layout.placements.every((placement) => placement.scale === 1)).toBe(true);
-    expect(layout.placements[0].widthPt).toBeCloseTo(millimetersToPoints(63), 8);
-    expect(layout.placements[0].heightPt).toBeCloseTo(millimetersToPoints(88), 8);
+    expect(layout.placements[0].widthPt).toBeCloseTo(millimetersToPoints(66), 8);
+    expect(layout.placements[0].heightPt).toBeCloseTo(millimetersToPoints(91), 8);
     expect(layout.pageSizePt[0]).toBeCloseTo(595.2755905, 6);
     expect(layout.pageSizePt[1]).toBeCloseTo(841.8897638, 6);
   });

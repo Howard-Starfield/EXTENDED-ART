@@ -1,4 +1,17 @@
-export const PROFILE_VERSION = "phase2-profiles-1";
+export const PROFILE_VERSION = "phase2-profiles-2";
+
+const centeredStandardCardBox = (masterWidthMm, masterHeightMm) => {
+  const cardWidthMm = 63;
+  const cardHeightMm = 88;
+  const leftMm = (masterWidthMm - cardWidthMm) / 2;
+  const topMm = (masterHeightMm - cardHeightMm) / 2;
+  return [
+    leftMm / masterWidthMm,
+    topMm / masterHeightMm,
+    (leftMm + cardWidthMm) / masterWidthMm,
+    (topMm + cardHeightMm) / masterHeightMm,
+  ];
+};
 
 export const fallbackProfiles = {
   standard: {
@@ -7,11 +20,11 @@ export const fallbackProfiles = {
     label: "Standard 3×3 Binder",
     grid: [3, 3],
     piece_count: 8,
-    insert_mm: [63, 88],
-    insert_px: [744, 1039],
-    master_mm: [189, 264],
-    master_px: [2232, 3118],
-    card_box: [1 / 3, 1 / 3, 2 / 3, 2 / 3],
+    insert_mm: [66, 91],
+    insert_px: [780, 1075],
+    master_mm: [198, 273],
+    master_px: [2339, 3224],
+    card_box: centeredStandardCardBox(198, 273),
     label_box: null,
     recommended_corner_radius_mm: 3,
   },
@@ -21,11 +34,11 @@ export const fallbackProfiles = {
     label: "Vault Binder",
     grid: [3, 3],
     piece_count: 8,
-    insert_mm: [66, 94],
-    insert_px: [780, 1110],
-    master_mm: [198, 282],
-    master_px: [2339, 3331],
-    card_box: [1 / 3, 1 / 3, 2 / 3, 2 / 3],
+    insert_mm: [68, 97],
+    insert_px: [803, 1146],
+    master_mm: [204, 291],
+    master_px: [2409, 3437],
+    card_box: centeredStandardCardBox(204, 291),
     label_box: null,
     recommended_corner_radius_mm: 3,
   },

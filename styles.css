@@ -353,7 +353,7 @@ body.setup-open { overflow: hidden; }
   box-shadow: inset 0 0 70px rgba(23,27,29,.06);
 }
 .canvas-shell {
-  position: relative; height: min(59vh, 630px); aspect-ratio: 2232 / 3118;
+  position: relative; height: min(59vh, 630px); aspect-ratio: 2339 / 3224;
   max-width: 100%; overflow: hidden; outline: none; touch-action: none;
   background: #dadbd5; box-shadow: var(--shadow), 0 0 0 1px rgba(23,27,29,.28);
   cursor: grab;

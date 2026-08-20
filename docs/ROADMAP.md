@@ -314,8 +314,8 @@ contract update and a regenerated reference fixture.
 
 | Profile | Master size | Master / insert pixels at 300 DPI | Source pieces | Default printed pieces |
 |---|---:|---:|---:|---:|
-| Standard 3x3 | 189 x 264 mm | 2232 x 3118 / 744 x 1039 | 9 | 8 outer inserts; center omitted |
-| Vault Binder | 198 x 282 mm | 2339 x 3331 / 780 x 1110 | 9 | 8 outer inserts; center omitted |
+| Standard 3x3 | 198 x 273 mm | 2339 x 3224 / 780 x 1075 | 9 | 8 outer inserts; center card remains 63 x 88 mm |
+| Vault Binder | 204 x 291 mm | 2409 x 3437 / 803 x 1146 | 9 | 8 outer inserts; center card remains 63 x 88 mm |
 | PSA Slab | 80.264 x 135.128 mm | 948 x 1596 | 1 overlay | 1 overlay with two blank openings |
 | 8x10 Photo Frame | 203.2 x 254 mm | 2400 x 3000 | 1 print | 1 print with blank card chamber |
 
@@ -323,14 +323,14 @@ Master dimensions come from rounding the complete physical size at 300 DPI.
 Insert dimensions come from independently rounding one insert. Therefore a
 master is not always exactly insert-pixels multiplied by grid count. Use
 rounded master edges for slicing, then resample each slice to the canonical
-insert dimensions. For example, Standard row source heights are 1039, 1040,
-and 1039 pixels before each output piece becomes 1039 pixels. Tests must lock
+insert dimensions. For example, Standard row source heights are 1075, 1074,
+and 1075 pixels before each output piece becomes 1075 pixels. Tests must lock
 this rule so a one-pixel seam cannot move between releases.
 
 Other fixed values:
 
-- Standard pocket: 63 x 88 mm.
-- Vault insert: 66 x 94 mm.
+- Standard pocket: 66 x 91 mm; centered card chamber: 63 x 88 mm.
+- Vault insert: 68 x 97 mm; centered card chamber: 63 x 88 mm.
 - PSA card chamber: 63 x 88 mm, top 36 mm in the current profile.
 - PSA card chamber left: 8.632 mm after horizontal centering.
 - PSA label default: 69.85 x 21.59 mm, left 5.207 mm, top 5 mm.
@@ -1216,7 +1216,7 @@ For every release candidate:
 
 - Print one Standard A4 and one Standard Letter sheet.
 - Print Vault A4 and both pages of Vault Letter; confirm every insert remains
-  66 x 94 mm.
+  68 x 97 mm.
 - Print one PSA sheet and measure the top label opening.
 - Print one 8x10 Letter output. For A4, use a printer that supports the required
   3.4 mm side margin and confirm the app displayed the margin warning.

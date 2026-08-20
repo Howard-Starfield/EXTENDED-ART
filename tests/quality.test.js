@@ -50,9 +50,9 @@ describe("image intake and quality limits", () => {
   });
 
   it("classifies effective DPI without reading file metadata", () => {
-    expect(classifyEffectiveDpi("Artwork", { width: 2232 }, 189).level).toBe("pass");
-    expect(classifyEffectiveDpi("Artwork", { width: 1500 }, 189).level).toBe("warning");
-    expect(classifyEffectiveDpi("Artwork", { width: 1000 }, 189).level).toBe("strong-warning");
-    expect(classifyEffectiveDpi("Artwork", { width: 500 }, 189).blocksPackage).toBe(true);
+    expect(classifyEffectiveDpi("Artwork", { width: 2339 }, 198).level).toBe("pass");
+    expect(classifyEffectiveDpi("Artwork", { width: 1800 }, 198).level).toBe("warning");
+    expect(classifyEffectiveDpi("Artwork", { width: 1000 }, 198).level).toBe("strong-warning");
+    expect(classifyEffectiveDpi("Artwork", { width: 500 }, 198).blocksPackage).toBe(true);
   });
 });

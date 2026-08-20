@@ -74,12 +74,12 @@ describe("cutout and guide geometry", () => {
   it("shifts the binder center-card cutout when a card offset is provided", () => {
     const profile = fallbackProfiles.standard;
     const baseline = getOutputMaskGeometry(profile)[0].pixels;
-    const offset = getOutputMaskGeometry(profile, { cardOffsetX: 744, cardOffsetY: 0 })[0].pixels;
+    const offset = getOutputMaskGeometry(profile, { cardOffsetX: 780, cardOffsetY: 0 })[0].pixels;
     // Width and height of the cutout must stay the same.
     expect(offset.width).toBe(baseline.width);
     expect(offset.height).toBe(baseline.height);
-    // But the cutout has slid by one cell to the right (744 px at 300 DPI).
-    expect(offset.x - baseline.x).toBe(744);
+    // But the cutout has slid by one pocket cell to the right.
+    expect(offset.x - baseline.x).toBe(780);
   });
 
   it("lets the on-screen chamber follow the picked cell when the offset is provided", () => {
@@ -88,12 +88,12 @@ describe("cutout and guide geometry", () => {
     // the cell the user picked — matching the cell picker and the print.
     const profile = fallbackProfiles.standard;
     const baseline = getOutputMaskGeometry(profile)[0].pixels;
-    const offset = getOutputMaskGeometry(profile, { cardOffsetX: 744, cardOffsetY: 0 })[0].pixels;
+    const offset = getOutputMaskGeometry(profile, { cardOffsetX: 780, cardOffsetY: 0 })[0].pixels;
     // Width and height of the cutout must stay the same.
     expect(offset.width).toBe(baseline.width);
     expect(offset.height).toBe(baseline.height);
-    // The cutout slid by one cell to the right (744 px at 300 DPI).
-    expect(offset.x - baseline.x).toBe(744);
+    // The cutout slid by one pocket cell to the right.
+    expect(offset.x - baseline.x).toBe(780);
   });
 
   it("translates the binder card cutout onto a sub-piece instead of scaling it", () => {
@@ -102,23 +102,17 @@ describe("cutout and guide geometry", () => {
     // (translated to the piece's local coords), not a scaled-down sliver.
     // Regression test for the "mini version" bug where applyCutoutMasks
     // scaled cutout coords by piece/master instead of translating them.
-    const profile = fallbackProfiles.standard; // 3x3 binder, piece = 744 x 1039
-    const piece = { column: 1, row: 0, source: { x: 744, y: 0 } };
+    const profile = fallbackProfiles.standard; // 3x3 binder, piece = 780 x 1075
+    const piece = { column: 1, row: 0, source: { x: 780, y: 0 } };
     const cutout = getOutputMaskGeometry(profile, {
       cardOffsetX: cellCardOffset(profile, 1, 0)[0],
       cardOffsetY: cellCardOffset(profile, 1, 0)[1],
     })[0];
-    // The cutout covers the top-center cell in the master.
-    expect(cutout.pixels.x).toBe(744);
-    expect(cutout.pixels.y).toBe(0);
-    // In the piece's local coords the cutout must be the whole piece
-    // (translated, not scaled):
-    //   rect.x = cutout.pixels.x - piece.source.x = 0
-    //   rect.y = cutout.pixels.y - piece.source.y = 0
-    //   rect.width = cutout.pixels.width  (= 744)
-    //   rect.height = cutout.pixels.height (= 1039)
-    expect(cutout.pixels.x - piece.source.x).toBe(0);
-    expect(cutout.pixels.y - piece.source.y).toBe(0);
+    // The card-sized cutout is centered inside the selected top-center pocket.
+    expect(cutout.pixels.x - piece.source.x).toBeGreaterThanOrEqual(17);
+    expect(cutout.pixels.x - piece.source.x).toBeLessThanOrEqual(18);
+    expect(cutout.pixels.y - piece.source.y).toBeGreaterThanOrEqual(17);
+    expect(cutout.pixels.y - piece.source.y).toBeLessThanOrEqual(18);
     expect(cutout.pixels.width).toBe(744);
     expect(cutout.pixels.height).toBe(1039);
   });

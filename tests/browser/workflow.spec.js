@@ -46,8 +46,8 @@ function pngFromRows(width, height, rows) {
 
 const FEATURE_CARD_WIDTH = 252;
 const FEATURE_CARD_HEIGHT = 352;
-const FEATURE_ART_WIDTH = 840;
-const FEATURE_ART_HEIGHT = 1176;
+const FEATURE_ART_WIDTH = 880;
+const FEATURE_ART_HEIGHT = 1232;
 const FEATURE_ARTWORK_REGION = { left: 24, top: 28, right: 228, bottom: 214 };
 
 function featureNoise(x, y) {
@@ -96,8 +96,8 @@ function featureCardPng(variant = 0) {
 function featureScenePng({
   width = FEATURE_ART_WIDTH,
   height = FEATURE_ART_HEIGHT,
-  cardLeft = 250,
-  cardTop = 350,
+  cardLeft = 270,
+  cardTop = 370,
   cardScale = 0.98,
   sceneCardVariant = 0,
 } = {}) {
@@ -241,8 +241,8 @@ test("auto-aligns after both required images decode", async ({ page }) => {
   expect(download.suggestedFilename()).toContain("_standard_alignment_proof_300dpi.png");
   const downloadPath = await download.path();
   const proof = readFileSync(downloadPath);
-  expect(proof.readUInt32BE(16)).toBe(2232);
-  expect(proof.readUInt32BE(20)).toBe(3118);
+  expect(proof.readUInt32BE(16)).toBe(2339);
+  expect(proof.readUInt32BE(20)).toBe(3224);
   const phys = pngChunkData(proof, "pHYs");
   expect(phys.readUInt32BE(0)).toBe(11811);
   expect(phys.readUInt32BE(4)).toBe(11811);
@@ -300,8 +300,8 @@ test("auto-aligns after both required images decode", async ({ page }) => {
   expect(optionalNames.filter((name) => name.startsWith("pieces/")).length).toBe(8);
   const masterEntry = optionalEntries.find((entry) => entry.filename.endsWith("_master_300dpi.png"));
   const masterBytes = Buffer.from(await masterEntry.getData(new Uint8ArrayWriter()));
-  expect(masterBytes.readUInt32BE(16)).toBe(2232);
-  expect(masterBytes.readUInt32BE(20)).toBe(3118);
+  expect(masterBytes.readUInt32BE(16)).toBe(2339);
+  expect(masterBytes.readUInt32BE(20)).toBe(3224);
   const masterPhys = pngChunkData(masterBytes, "pHYs");
   expect(masterPhys.readUInt32BE(0)).toBe(11811);
   expect(masterPhys.readUInt32BE(4)).toBe(11811);
@@ -310,8 +310,8 @@ test("auto-aligns after both required images decode", async ({ page }) => {
   expect(masterSrgb[0]).toBe(0);
   const pieceEntry = optionalEntries.find((entry) => entry.filename.startsWith("pieces/"));
   const pieceBytes = Buffer.from(await pieceEntry.getData(new Uint8ArrayWriter()));
-  expect(pieceBytes.readUInt32BE(16)).toBe(744);
-  expect(pieceBytes.readUInt32BE(20)).toBe(1039);
+  expect(pieceBytes.readUInt32BE(16)).toBe(780);
+  expect(pieceBytes.readUInt32BE(20)).toBe(1075);
   await optionalReader.close();
 });
 

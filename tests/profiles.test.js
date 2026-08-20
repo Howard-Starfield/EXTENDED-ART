@@ -12,14 +12,21 @@ import {
 } from "../src/profiles.js";
 
 describe("print profile contracts", () => {
-  it("keeps the standard binder at the exact master and insert sizes", () => {
-    expect(fallbackProfiles.standard.master_px).toEqual([2232, 3118]);
-    expect(fallbackProfiles.standard.insert_px).toEqual([744, 1039]);
+  it("uses pocket-sized binder tiles while keeping the card chamber standard-sized", () => {
+    expect(fallbackProfiles.standard.master_px).toEqual([2339, 3224]);
+    expect(fallbackProfiles.standard.insert_px).toEqual([780, 1075]);
+    expect(fallbackProfiles.vaultx.master_px).toEqual([2409, 3437]);
+    expect(fallbackProfiles.vaultx.insert_px).toEqual([803, 1146]);
+    expect(cardPhysicalMm(fallbackProfiles.standard)[0]).toBeCloseTo(63, 8);
+    expect(cardPhysicalMm(fallbackProfiles.standard)[1]).toBeCloseTo(88, 8);
+    expect(cardPhysicalMm(fallbackProfiles.vaultx)[0]).toBeCloseTo(63, 8);
+    expect(cardPhysicalMm(fallbackProfiles.vaultx)[1]).toBeCloseTo(88, 8);
     expect(fallbackProfiles.standard.piece_count).toBe(8);
   });
 
   it("derives a standard 63 by 88 millimetre card chamber", () => {
-    expect(cardPhysicalMm(fallbackProfiles.standard)).toEqual([63, 88]);
+    expect(cardPhysicalMm(fallbackProfiles.standard)[0]).toBeCloseTo(63, 8);
+    expect(cardPhysicalMm(fallbackProfiles.standard)[1]).toBeCloseTo(88, 8);
     expect(cardPhysicalMm(fallbackProfiles.psa)[0]).toBeCloseTo(63, 8);
     expect(cardPhysicalMm(fallbackProfiles.psa)[1]).toBeCloseTo(88, 8);
   });
@@ -94,8 +101,8 @@ describe("effectiveCardBox", () => {
 
   it("shifts the binder card box by the requested pixel offset", () => {
     const profile = fallbackProfiles.standard;
-    const offsetX = 744; // one cell wide
-    const offsetY = 1039; // one cell tall
+    const offsetX = 780; // one standard pocket cell wide at 300 DPI
+    const offsetY = 1075; // one standard pocket cell tall at 300 DPI
     const result = effectiveCardBox(profile, offsetX, offsetY);
     // Left should move by one cell width.
     expect(result[0] - profile.card_box[0]).toBeCloseTo(offsetX / profile.master_px[0], 8);
@@ -134,19 +141,19 @@ describe("cellCardOffset / cellFromCardOffset", () => {
 
   it("snaps to one cell horizontally and vertically for the standard profile", () => {
     const profile = fallbackProfiles.standard;
-    // One cell horizontally = master_px[0] / 3 = 744 px.
-    // One cell vertically = master_px[1] / 3 = 3118/3 ≈ 1039.33 px.
+    // One cell horizontally = master_px[0] / 3 = 2339/3 ≈ 779.67 px.
+    // One cell vertically = master_px[1] / 3 = 3224/3 ≈ 1074.67 px.
     const [dx, dy] = cellCardOffset(profile, 2, 0);
-    expect(dx).toBeCloseTo(744, 6);
-    expect(dy).toBeCloseTo(-1039.333, 3);
+    expect(dx).toBeCloseTo(779.667, 3);
+    expect(dy).toBeCloseTo(-1074.667, 3);
   });
 
   it("respects the larger cell size for the vaultx profile", () => {
     const profile = fallbackProfiles.vaultx;
-    // vaultx cells are master_px[0]/3 x master_px[1]/3 = 779.667 x 1110.333 px.
+    // vaultx cells are master_px[0]/3 x master_px[1]/3 = 803 x 1145.667 px.
     const [dx, dy] = cellCardOffset(profile, 2, 0);
-    expect(dx).toBeCloseTo(779.667, 3);
-    expect(dy).toBeCloseTo(-1110.333, 3);
+    expect(dx).toBeCloseTo(803, 3);
+    expect(dy).toBeCloseTo(-1145.667, 3);
   });
 
   it("round-trips between cell and offset for every cell of a 3x3 binder", () => {
