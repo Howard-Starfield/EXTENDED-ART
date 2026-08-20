@@ -94,22 +94,21 @@ export function applyCutoutMasks(
   width,
   height,
   profile,
-  { labelBox = profile.label_box, cornerRadiusMm = profile.recommended_corner_radius_mm || 0, cardOffsetX = 0, cardOffsetY = 0 } = {},
+  { labelBox = profile.label_box, cornerRadiusMm = profile.recommended_corner_radius_mm || 0, cardOffsetX = 0, cardOffsetY = 0, pieceSource = { x: 0, y: 0 } } = {},
 ) {
   const cutouts = getOutputMaskGeometry(profile, { labelBox, cornerRadiusMm, cardOffsetX, cardOffsetY });
   for (const cutout of cutouts) {
     // The cutout's pixel coords are in the master's space. We translate them
     // into the current canvas's space (which may be a sub-piece of the master)
-    // so the cutout lands exactly on the piece the user picked.
-    const scaleX = width / profile.master_px[0];
-    const scaleY = height / profile.master_px[1];
+    // so the cutout lands exactly on the piece the user picked — not a
+    // scaled-down sliver of the master inside the piece.
     const rect = {
-      x: cutout.pixels.x * scaleX,
-      y: cutout.pixels.y * scaleY,
-      width: cutout.pixels.width * scaleX,
-      height: cutout.pixels.height * scaleY,
+      x: cutout.pixels.x - pieceSource.x,
+      y: cutout.pixels.y - pieceSource.y,
+      width: cutout.pixels.width,
+      height: cutout.pixels.height,
     };
-    const radius = mmToPixels(cutout.radiusMm) * Math.min(scaleX, scaleY);
+    const radius = mmToPixels(cutout.radiusMm);
     context.save();
     context.globalCompositeOperation = "source-over";
     context.globalAlpha = 1;
@@ -153,7 +152,13 @@ export function renderCutReadyPieceFromMaster({ masterCanvas, piece, profile, co
   // pieces, so the cutout follows the user's card position into the print.
   const [pickedCol, pickedRow] = cellFromOffset(profile, cardOffsetX, cardOffsetY);
   if (piece.column === pickedCol && piece.row === pickedRow) {
-    applyCutoutMasks(context, piece.output.width, piece.output.height, profile, { labelBox, cornerRadiusMm, cardOffsetX, cardOffsetY });
+    applyCutoutMasks(context, piece.output.width, piece.output.height, profile, {
+      labelBox,
+      cornerRadiusMm,
+      cardOffsetX,
+      cardOffsetY,
+      pieceSource: piece.source,
+    });
   }
   return canvas;
 }

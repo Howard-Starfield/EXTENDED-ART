@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { fallbackProfiles } from "../src/profiles.js";
+import { fallbackProfiles, cellCardOffset } from "../src/profiles.js";
+import { getOutputMaskGeometry } from "../src/output-geometry.js";
 import {
   BINDER_POSITION_IDS,
   applyRoundedAlphaMask,
+  cellFromOffset,
   getPieceGeometry,
   getPrintablePieceGeometry,
   mmToPixels,
@@ -80,6 +82,46 @@ describe("deterministic output pieces", () => {
         width: fallbackProfiles[name].master_px[0],
         height: fallbackProfiles[name].master_px[1],
       });
+    }
+  });
+
+  it("translates the cutout to fill the entire picked cell for every binder position", () => {
+    // Regression test for the "mini version" cutout bug: previously
+    // applyCutoutMasks scaled the cutout's master-space coords by
+    // pieceWidth / masterWidth instead of translating by pieceSource,
+    // which produced a 1/9-sized sliver in the corner of the picked piece.
+    // For every cell, the cutout rect (in piece coords) must cover the
+    // entire piece — off by at most a couple of pixels of rounding.
+    for (const name of ["standard", "vaultx"]) {
+      const profile = fallbackProfiles[name];
+      const geom = getPieceGeometry(profile);
+      for (let row = 0; row < 3; row += 1) {
+        for (let col = 0; col < 3; col += 1) {
+          const [ox, oy] = cellCardOffset(profile, col, row);
+          const [pickedCol, pickedRow] = cellFromOffset(profile, ox, oy);
+          expect([pickedCol, pickedRow]).toEqual([col, row]);
+          const cutouts = getOutputMaskGeometry(profile, { cardOffsetX: ox, cardOffsetY: oy });
+          expect(cutouts).toHaveLength(1);
+          const cut = cutouts[0];
+          const piece = geom.find((p) => p.column === col && p.row === row);
+          expect(piece).toBeDefined();
+          const rect = {
+            x: cut.pixels.x - piece.source.x,
+            y: cut.pixels.y - piece.source.y,
+            width: cut.pixels.width,
+            height: cut.pixels.height,
+          };
+          // Allow ±2px rounding tolerance from millimetre → pixel conversion
+          // (the cutout is derived from master_mm, the piece from master_px,
+          // and the two don't perfectly agree at the bottom edge — 1px = 0.0085mm)
+          expect(rect.x).toBeGreaterThanOrEqual(-2);
+          expect(rect.x).toBeLessThanOrEqual(2);
+          expect(rect.y).toBeGreaterThanOrEqual(-2);
+          expect(rect.y).toBeLessThanOrEqual(2);
+          expect(Math.abs(rect.width - piece.source.width)).toBeLessThanOrEqual(2);
+          expect(Math.abs(rect.height - piece.source.height)).toBeLessThanOrEqual(2);
+        }
+      }
     }
   });
 });
