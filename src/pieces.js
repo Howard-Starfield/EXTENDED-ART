@@ -47,6 +47,9 @@ export function getPieceGeometry(profile) {
         id,
         row,
         column,
+        // The center is the *default* card slot but is NOT inherently
+        // unprintable. `getPrintablePieceGeometry` decides which cell
+        // gets excluded based on the user's picked cell — see below.
         printable: !(profile.piece_count === 8 && id === CENTER_POSITION_ID),
         source: { x: left, y: top, width: right - left, height: bottom - top },
         output: { width: insertWidth, height: insertHeight },
@@ -56,8 +59,18 @@ export function getPieceGeometry(profile) {
   return pieces;
 }
 
-export function getPrintablePieceGeometry(profile) {
-  return getPieceGeometry(profile).filter((piece) => piece.printable);
+// Returns the pieces that should actually print. The "missing" cell is
+// whichever cell the user picked for the original card — NOT always the
+// center. If the user keeps the default centre position the center is
+// excluded (legacy behaviour); if they pick any other cell, the center
+// becomes a regular printable piece and the picked cell is the one that's
+// missing from the print.
+export function getPrintablePieceGeometry(profile, excludeCol, excludeRow) {
+  const all = getPieceGeometry(profile);
+  if (Number.isInteger(excludeCol) && Number.isInteger(excludeRow)) {
+    return all.filter((piece) => !(piece.column === excludeCol && piece.row === excludeRow));
+  }
+  return all.filter((piece) => piece.printable);
 }
 
 function createCanvas({ width, height, documentRef, canvasFactory }) {

@@ -51,9 +51,17 @@ function placementFor({ profile, paper, pageIndex, piece, rows, group, page }) {
   };
 }
 
-export function createPageLayout(profile, paper, { includeCenter = false } = {}) {
+export function createPageLayout(profile, paper, { includeCenter = false, excludeCol, excludeRow } = {}) {
   const page = paperPagePoints(paper);
-  const pieces = includeCenter ? getPieceGeometry(profile) : getPrintablePieceGeometry(profile);
+  // For the cut-ready PDF: whichever cell the user picked is the one
+  // that's missing (because the original card goes there). The center is
+  // only missing if the user kept the default centre position.
+  // For the with-card reference PDF: `includeCenter: true` includes all
+  // 9 cells regardless of the pick, so the card overlay can land on
+  // any of them.
+  const pieces = includeCenter
+    ? getPieceGeometry(profile)
+    : getPrintablePieceGeometry(profile, excludeCol, excludeRow);
   const groups = rowGroups(profile, paper.name);
   const warnings = [];
   const pages = [];

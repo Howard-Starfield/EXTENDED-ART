@@ -2,6 +2,7 @@ import { fallbackPapers, psaLabelBox } from "./profiles.js";
 import { getOutputMaskGeometry } from "./output-geometry.js";
 import { createPageLayout } from "./page-layout.js";
 import {
+  cellFromOffset,
   getPieceGeometry,
   getPrintablePieceGeometry,
   renderCutReadyPieceFromMaster,
@@ -154,12 +155,23 @@ export async function createBrowserPrintPackage({
   const options = outputOptions(requestedOptions);
   const labelBox = profile.name === "psa" || profile.name === "psaMini" ? psaLabelBox(profile, state.psaLabelWidthMm, state.psaLabelHeightMm) : null;
   const outputPaperSet = outputPapers({ paper, papers: state.papers, includeSecondPaper: options.includeSecondPaper });
-  const layouts = outputPaperSet.map((item) => createPageLayout(profile, item));
+  const cardOffsetX = Number(state.cardOffsetX) || 0;
+  const cardOffsetY = Number(state.cardOffsetY) || 0;
+  // Whichever cell the user picked for the original card is the one
+  // that should be missing from the cut-ready print (it's the slot for
+  // the physical card). Pass it to the layout so the printable-piece
+  // list excludes the picked cell, not always the center.
+  const [pickedCol, pickedRow] = cellFromOffset(profile, cardOffsetX, cardOffsetY);
+  const layouts = outputPaperSet.map((item) =>
+    createPageLayout(profile, item, { excludeCol: pickedCol, excludeRow: pickedRow }),
+  );
   const layout = layouts[0];
   const fullLayouts = options.includeWithCardPdf
     ? outputPaperSet.map((item) => createPageLayout(profile, item, { includeCenter: true }))
     : null;
-  const pieceGeometry = options.includeWithCardPdf ? getPieceGeometry(profile) : getPrintablePieceGeometry(profile);
+  const pieceGeometry = options.includeWithCardPdf
+    ? getPieceGeometry(profile)
+    : getPrintablePieceGeometry(profile, pickedCol, pickedRow);
   const memory = estimatePeakMemory({
     decodedInputBytes: (state.artDimensions?.width * state.artDimensions?.height + state.cardDimensions?.width * state.cardDimensions?.height) * 4,
     rasterBytes: profile.master_px[0] * profile.master_px[1] * 4 * (options.includeWithCardPdf ? 5 : 3),
@@ -174,8 +186,6 @@ export async function createBrowserPrintPackage({
   const masterPng = await canvasPng(masterCanvas);
   const cutReadyPieces = new Map();
   const fullPieces = new Map();
-  const cardOffsetX = Number(state.cardOffsetX) || 0;
-  const cardOffsetY = Number(state.cardOffsetY) || 0;
   for (let index = 0; index < pieceGeometry.length; index += 1) {
     ensureNotAborted(signal);
     const piece = pieceGeometry[index];
@@ -225,7 +235,7 @@ export async function createBrowserPrintPackage({
   }
   if (options.includeMaster) entries.push({ path: names.masterPng, bytes: await blobBytes(masterPng), mime: "image/png" });
   if (options.includePieces) {
-    for (const piece of getPrintablePieceGeometry(profile)) {
+    for (const piece of getPrintablePieceGeometry(profile, pickedCol, pickedRow)) {
       entries.push({ path: names.piecePng(piece.id), bytes: await blobBytes(cutReadyPieces.get(piece.id)), mime: "image/png" });
     }
   }

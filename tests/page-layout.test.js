@@ -34,6 +34,20 @@ describe("exact page layout contract", () => {
     expect(layout.warnings[0]).toContain("3.4 mm");
   });
 
+  it("swaps the center into the printable set when the user picks a non-center cell", () => {
+    // Default (no pick): center is excluded — legacy behaviour.
+    const noPick = createPageLayout(fallbackProfiles.standard, fallbackPapers.a4);
+    expect(noPick.placements.map((p) => p.pieceId)).not.toContain("C");
+    expect(noPick.placements).toHaveLength(8);
+    // Picked bottom-left: BL is excluded, center is back.
+    const blPicked = createPageLayout(fallbackProfiles.standard, fallbackPapers.a4, {
+      excludeCol: 0, excludeRow: 2,
+    });
+    expect(blPicked.placements.map((p) => p.pieceId)).not.toContain("BL");
+    expect(blPicked.placements.map((p) => p.pieceId)).toContain("C");
+    expect(blPicked.placements).toHaveLength(8);
+  });
+
   it("centers the PSA overlay at exact physical size on Letter", () => {
     const layout = createPageLayout(fallbackProfiles.psa, fallbackPapers.letter);
     const placement = layout.placements[0];

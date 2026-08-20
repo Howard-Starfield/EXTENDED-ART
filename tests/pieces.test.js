@@ -124,4 +124,33 @@ describe("deterministic output pieces", () => {
       }
     }
   });
+
+  it("excludes the picked cell from printable pieces, not the center", () => {
+    // Regression test: previously `getPieceGeometry` hardcoded the
+    // center as `printable: false` and `getPrintablePieceGeometry`
+    // always returned the 8 outer cells. So picking a non-center cell
+    // would leave the center as a blank gap in the print. Now the
+    // printable list is driven by the picked cell instead.
+    for (const name of ["standard", "vaultx"]) {
+      const profile = fallbackProfiles[name];
+      const all = getPieceGeometry(profile).map((p) => p.id);
+      // Legacy behaviour (no pick specified): center is missing.
+      const defaultPrintable = getPrintablePieceGeometry(profile).map((p) => p.id);
+      expect(defaultPrintable).toEqual(all.filter((id) => id !== "C"));
+      // Pick bottom-left: center is back, BL is gone.
+      const blPrintable = getPrintablePieceGeometry(profile, 0, 2).map((p) => p.id);
+      expect(blPrintable).not.toContain("BL");
+      expect(blPrintable).toContain("C");
+      expect(blPrintable).toHaveLength(8);
+      // Pick top-right: center is back, TR is gone.
+      const trPrintable = getPrintablePieceGeometry(profile, 2, 0).map((p) => p.id);
+      expect(trPrintable).not.toContain("TR");
+      expect(trPrintable).toContain("C");
+      expect(trPrintable).toHaveLength(8);
+      // Pick the center: same as legacy — center is gone, outer 8 stay.
+      const cPrintable = getPrintablePieceGeometry(profile, 1, 1).map((p) => p.id);
+      expect(cPrintable).not.toContain("C");
+      expect(cPrintable).toHaveLength(8);
+    }
+  });
 });
