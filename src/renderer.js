@@ -59,7 +59,8 @@ export function drawAlignmentScene({ context, width, height, profile, state, art
   const cellW = width / columns;
   const cellH = height / rows;
   const pieceRadius = (state.cornerRadiusMm / profile.insert_mm[0]) * cellW;
-  // The card image and the export cutout follow the user's offset…
+  // The card image, the on-screen chamber, and the cyan stroke all follow
+  // the user's picked cell. The export cutout follows the same offset.
   const cardBox = effectiveCardBox(profile, state.cardOffsetX, state.cardOffsetY);
   const cardX = cardBox[0] * width;
   const cardY = cardBox[1] * height;
@@ -67,13 +68,6 @@ export function drawAlignmentScene({ context, width, height, profile, state, art
   const cardH = (cardBox[3] - cardBox[1]) * height;
   const cardWidthMm = profile.master_mm[0] * (cardBox[2] - cardBox[0]);
   const cardRadius = (state.cornerRadiusMm / cardWidthMm) * cardW;
-  // …but the on-screen chamber / grid guard stays anchored to the original
-  // card_box so the user always sees where the "default" card placement is.
-  const referenceCardBox = profile.card_box;
-  const refX = referenceCardBox[0] * width;
-  const refY = referenceCardBox[1] * height;
-  const refW = (referenceCardBox[2] - referenceCardBox[0]) * width;
-  const refH = (referenceCardBox[3] - referenceCardBox[1]) * height;
 
   if (cardImage && state.showCard) {
     drawCardReference(context, cardImage, cardBox, width, height, cardRadius, state.opacity, state.difference);
@@ -83,8 +77,8 @@ export function drawAlignmentScene({ context, width, height, profile, state, art
     const cutouts = getCutoutGeometry(profile, {
       labelBox,
       cornerRadiusMm: state.cornerRadiusMm,
-      // Deliberately do NOT pass cardOffsetX/Y here — the on-screen chamber
-      // is the "default card placement" indicator and stays anchored.
+      cardOffsetX: state.cardOffsetX,
+      cardOffsetY: state.cardOffsetY,
     }).filter((cutout) => !(cutout.id === "CARD" && includeCard));
     context.save();
     for (const cutout of cutouts) {
@@ -120,11 +114,11 @@ export function drawAlignmentScene({ context, width, height, profile, state, art
         context.stroke();
       }
     }
-    // The cyan stroke is the "grid guard" — anchored to the original center
-    // so nudging the card doesn't drag the reference frame around.
+    // The cyan stroke is the "card position" outline — it follows the
+    // user's picked cell so the on-screen preview matches the print.
     context.strokeStyle = state.difference ? "#f4d34d" : "#2aa9b8";
     context.lineWidth = 2;
-    roundedRectPath(context, refX + 1, refY + 1, refW - 2, refH - 2, cardRadius);
+    roundedRectPath(context, cardX + 1, cardY + 1, cardW - 2, cardH - 2, cardRadius);
     context.stroke();
     context.restore();
   }

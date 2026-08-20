@@ -94,10 +94,13 @@ export function applyCutoutMasks(
   width,
   height,
   profile,
-  { labelBox = profile.label_box, cornerRadiusMm = profile.recommended_corner_radius_mm || 0 } = {},
+  { labelBox = profile.label_box, cornerRadiusMm = profile.recommended_corner_radius_mm || 0, cardOffsetX = 0, cardOffsetY = 0 } = {},
 ) {
-  const cutouts = getOutputMaskGeometry(profile, { labelBox, cornerRadiusMm });
+  const cutouts = getOutputMaskGeometry(profile, { labelBox, cornerRadiusMm, cardOffsetX, cardOffsetY });
   for (const cutout of cutouts) {
+    // The cutout's pixel coords are in the master's space. We translate them
+    // into the current canvas's space (which may be a sub-piece of the master)
+    // so the cutout lands exactly on the piece the user picked.
     const scaleX = width / profile.master_px[0];
     const scaleY = height / profile.master_px[1];
     const rect = {
@@ -118,7 +121,22 @@ export function applyCutoutMasks(
   return cutouts;
 }
 
-export function renderCutReadyPieceFromMaster({ masterCanvas, piece, profile, cornerRadiusMm, labelBox = profile.label_box, documentRef = globalThis.document, canvasFactory }) {
+// Returns the [col, row] of the cell that the given pixel offset corresponds
+// to, clamped to the profile's grid. Mirrors the renderer helper so the
+// export pipeline stays in sync with the on-screen picker.
+export function cellFromOffset(profile, cardOffsetX, cardOffsetY) {
+  if (!profile || !profile.grid) return [0, 0];
+  const [cols, rows] = profile.grid;
+  const [masterW, masterH] = profile.master_px;
+  const col = Math.round((Number(cardOffsetX) / masterW) * cols + (cols - 1) / 2);
+  const row = Math.round((Number(cardOffsetY) / masterH) * rows + (rows - 1) / 2);
+  return [
+    Math.max(0, Math.min(cols - 1, col)),
+    Math.max(0, Math.min(rows - 1, row)),
+  ];
+}
+
+export function renderCutReadyPieceFromMaster({ masterCanvas, piece, profile, cornerRadiusMm, labelBox = profile.label_box, documentRef = globalThis.document, canvasFactory, cardOffsetX = 0, cardOffsetY = 0 }) {
   const canvas = renderPieceFromMaster({
     masterCanvas,
     piece,
@@ -129,10 +147,13 @@ export function renderCutReadyPieceFromMaster({ masterCanvas, piece, profile, co
   });
   const context = canvas.getContext("2d", { alpha: true, colorSpace: "srgb" });
   if (!context) throw new Error("The cut-ready piece canvas could not be created.");
-  if (piece.source.x === 0 && piece.source.y === 0
-    && piece.source.width === profile.master_px[0]
-    && piece.source.height === profile.master_px[1]) {
-    applyCutoutMasks(context, piece.output.width, piece.output.height, profile, { labelBox, cornerRadiusMm });
+  // Apply the cutout to whichever piece the user picked. For a 1x1 profile
+  // the picked cell is the only cell (so this matches the previous "full
+  // master" check). For a binder, the picked cell may be one of the outer
+  // pieces, so the cutout follows the user's card position into the print.
+  const [pickedCol, pickedRow] = cellFromOffset(profile, cardOffsetX, cardOffsetY);
+  if (piece.column === pickedCol && piece.row === pickedRow) {
+    applyCutoutMasks(context, piece.output.width, piece.output.height, profile, { labelBox, cornerRadiusMm, cardOffsetX, cardOffsetY });
   }
   return canvas;
 }

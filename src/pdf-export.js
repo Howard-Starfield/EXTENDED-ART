@@ -169,6 +169,8 @@ export async function createWithCardReferencePdf({
   cardSource,
   labelBox = profile.label_box,
   cornerRadiusMm = profile.recommended_corner_radius_mm || 0,
+  cardOffsetX = 0,
+  cardOffsetY = 0,
   title = "ExtendedArt with-card reference",
   layout = createPageLayout(profile, paper, { includeCenter: true }),
 }) {
@@ -182,6 +184,19 @@ export async function createWithCardReferencePdf({
 
   for (const pageLayout of layout.pages) {
     const page = pdfDoc.addPage([pageLayout.widthPt, pageLayout.heightPt]);
+    // Find the piece that corresponds to the user's picked cell so the card
+    // image follows the same position as the on-screen picker and the
+    // cutout in the cut-ready PDF.
+    const [pickedCol, pickedRow] = (() => {
+      const [cols, rows] = profile.grid;
+      const col = Math.round((cardOffsetX / profile.master_px[0]) * cols + (cols - 1) / 2);
+      const row = Math.round((cardOffsetY / profile.master_px[1]) * rows + (rows - 1) / 2);
+      return [
+        Math.max(0, Math.min(cols - 1, col)),
+        Math.max(0, Math.min(rows - 1, row)),
+      ];
+    })();
+    const pickedPieceId = `R${pickedRow + 1}C${pickedCol + 1}`;
     for (const placement of pageLayout.placements) {
       page.drawImage(images.get(placement.pieceId), {
         x: placement.xPt,
@@ -189,13 +204,19 @@ export async function createWithCardReferencePdf({
         width: placement.widthPt,
         height: placement.heightPt,
       });
-      if (placement.pieceId === "C") {
-        page.drawImage(cardImage, { x: placement.xPt, y: placement.yPt, width: placement.widthPt, height: placement.heightPt });
-      } else if (profile.grid[0] === 1) {
-        const cardCutout = getCutoutGeometry(profile, { labelBox, cornerRadiusMm }).find((cutout) => cutout.id === "CARD");
-        if (cardCutout) {
-          const rect = cutoutRect(profile, placement, cardCutout);
-          page.drawImage(cardImage, { x: rect.x, y: rect.y, width: rect.width, height: rect.height });
+      if (placement.pieceId === pickedPieceId) {
+        if (profile.piece_count > 1) {
+          // Binder: the whole picked piece is the card slot, so the image
+          // fills the entire piece exactly.
+          page.drawImage(cardImage, { x: placement.xPt, y: placement.yPt, width: placement.widthPt, height: placement.heightPt });
+        } else {
+          // 1x1 profile (PSA, photo): the card sits inside a cutout, not the
+          // full piece. Use the cutout's exact rectangle.
+          const cardCutout = getCutoutGeometry(profile, { labelBox, cornerRadiusMm, cardOffsetX, cardOffsetY }).find((cutout) => cutout.id === "CARD");
+          if (cardCutout) {
+            const rect = cutoutRect(profile, placement, cardCutout);
+            page.drawImage(cardImage, { x: rect.x, y: rect.y, width: rect.width, height: rect.height });
+          }
         }
       }
       drawCutouts(page, profile, placement, { labelBox, cornerRadiusMm, fillCutouts: true });

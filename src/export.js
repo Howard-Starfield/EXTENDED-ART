@@ -170,6 +170,8 @@ export async function createBrowserPrintPackage({
   const masterPng = await canvasPng(masterCanvas);
   const cutReadyPieces = new Map();
   const fullPieces = new Map();
+  const cardOffsetX = Number(state.cardOffsetX) || 0;
+  const cardOffsetY = Number(state.cardOffsetY) || 0;
   for (let index = 0; index < pieceGeometry.length; index += 1) {
     ensureNotAborted(signal);
     const piece = pieceGeometry[index];
@@ -177,7 +179,16 @@ export async function createBrowserPrintPackage({
     fullPieces.set(piece.id, await canvasPng(fullCanvas));
     releaseCanvas(fullCanvas);
     if (layout.placements.some((placement) => placement.pieceId === piece.id)) {
-      const cutCanvas = renderCutReadyPieceFromMaster({ masterCanvas, piece, profile, cornerRadiusMm: state.cornerRadiusMm, labelBox, documentRef });
+      const cutCanvas = renderCutReadyPieceFromMaster({
+        masterCanvas,
+        piece,
+        profile,
+        cornerRadiusMm: state.cornerRadiusMm,
+        labelBox,
+        documentRef,
+        cardOffsetX,
+        cardOffsetY,
+      });
       cutReadyPieces.set(piece.id, await canvasPng(cutCanvas));
       releaseCanvas(cutCanvas);
     }
@@ -201,7 +212,7 @@ export async function createBrowserPrintPackage({
       { path: outputNamesForPaper.printGuidePdf, bytes: printGuidePdf, mime: "application/pdf" },
     );
     if (options.includeWithCardPdf) {
-      const withCardPdf = await createWithCardReferencePdf({ profile, paper: outputPaper, pieceSources: fullPieces, cardSource: cardPng, labelBox, cornerRadiusMm: state.cornerRadiusMm, layout: fullLayouts[index] });
+      const withCardPdf = await createWithCardReferencePdf({ profile, paper: outputPaper, pieceSources: fullPieces, cardSource: cardPng, labelBox, cornerRadiusMm: state.cornerRadiusMm, layout: fullLayouts[index], cardOffsetX, cardOffsetY });
       entries.push({ path: outputNamesForPaper.withCardPdf, bytes: withCardPdf, mime: "application/pdf" });
     }
     if (options.includeFullArtPdf) {

@@ -82,18 +82,18 @@ describe("cutout and guide geometry", () => {
     expect(offset.x - baseline.x).toBe(744);
   });
 
-  it("lets the on-screen reference chamber stay at the default center by omitting the offset", () => {
-    // Mirrors the renderer contract: drawAlignmentScene calls getCutoutGeometry
-    // without cardOffsetX/Y so the white chamber keeps marking the "default"
-    // placement even after the user nudges the card to a different cell.
+  it("lets the on-screen chamber follow the picked cell when the offset is provided", () => {
+    // drawAlignmentScene threads state.cardOffsetX/Y into getCutoutGeometry so
+    // the on-screen chamber, the cyan stroke, and the export cutout all sit on
+    // the cell the user picked — matching the cell picker and the print.
     const profile = fallbackProfiles.standard;
-    const withOffset = getOutputMaskGeometry(profile, { cardOffsetX: 744, cardOffsetY: 0 })[0].pixels;
-    const withoutOffset = getOutputMaskGeometry(profile)[0].pixels;
-    expect(withoutOffset.x).toBe(withOffset.x - 744);
-    expect(withoutOffset.y).toBe(withOffset.y);
-    // Size is identical — only the position differs.
-    expect(withoutOffset.width).toBe(withOffset.width);
-    expect(withoutOffset.height).toBe(withOffset.height);
+    const baseline = getOutputMaskGeometry(profile)[0].pixels;
+    const offset = getOutputMaskGeometry(profile, { cardOffsetX: 744, cardOffsetY: 0 })[0].pixels;
+    // Width and height of the cutout must stay the same.
+    expect(offset.width).toBe(baseline.width);
+    expect(offset.height).toBe(baseline.height);
+    // The cutout slid by one cell to the right (744 px at 300 DPI).
+    expect(offset.x - baseline.x).toBe(744);
   });
 
   it("ignores the card offset for non-binder profiles", () => {
