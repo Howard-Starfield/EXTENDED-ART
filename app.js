@@ -10,6 +10,7 @@ import {
   isSlotFillProfile,
   PROFILE_VERSION,
   pixelPair,
+  profileIntake,
   profileSummary,
   psaLabelBox as makePsaLabelBox,
 } from "./src/profiles.js";
@@ -43,6 +44,7 @@ import {
   selectProxySeat,
   zoomSelectedProxy,
 } from "./src/proxy-studio.js";
+import { isFileDragEvent, routeStudioDroppedFiles } from "./src/file-intake-routing.js";
 
 const $ = (selector) => document.querySelector(selector);
 const canvas = $("#alignmentCanvas");
@@ -193,8 +195,8 @@ function updateStudioContract() {
   $("#activeSpec").textContent = `${profile.label} | ${pixelPair(profile.master_px)} px | ${paper.label} | 300 DPI`;
   if (slotFill) {
     $("#methodCopy").textContent = "Drop card images into the 3×3 board. Select a seat to pan and zoom. Hover a filled seat to remove it. Empty seats fill first; a full board replaces the oldest card.";
-    $("#emptyStateTitle").textContent = "Drop proxy card images";
-    $("#emptyStateCopy").textContent = "Each seat prints at 63 × 88 mm. Add cards on the left, then refine with drag and zoom.";
+    $("#emptyStateTitle").textContent = "Drop proxy cards onto this board";
+    $("#emptyStateCopy").textContent = "Drop cards here or on the left. Each seat prints at 63 × 88 mm.";
     $(".workspace-title p").textContent = "Fill the proxy sheet";
     $("#cutReadyOutputHelp").textContent = "Nine seats max · dotted outer cut guides";
     $("#pieceContractLabel").textContent = "Card";
@@ -208,10 +210,10 @@ function updateStudioContract() {
     $("#methodCopy").textContent = isBinder
       ? "The original card is required for the automatic baseline. Drag the extended artwork underneath the fixed center reference until the edges meet."
       : "The original card is required for the automatic baseline. The card zone stays fixed while you refine the display scene underneath it.";
-    $("#emptyStateTitle").textContent = "Place your extended artwork";
+    $("#emptyStateTitle").textContent = "Drop artwork onto this board";
     $("#emptyStateCopy").textContent = isBinder
-      ? `Drop the full ${profile.grid[0]}x${profile.grid[1]} image on the left to begin.`
-      : `Drop the full ${profile.label} image on the left to begin.`;
+      ? `Drop images anywhere on the page. One file fills the next empty seat; two files load art then card.`
+      : `Drop images anywhere on the page. One file fills the next empty seat; two files load art then card.`;
     $(".workspace-title p").textContent = "Align the scene";
     $("#cutReadyOutputHelp").textContent = profile.name === "psa" || profile.name === "psaMini"
       ? "White PSA label + card chambers with dotted guides"
@@ -857,6 +859,7 @@ function bindDropZone(zoneSelector, inputSelector, kind) {
   });
   zone.addEventListener("drop", (event) => {
     event.preventDefault();
+    event.stopPropagation();
     if (state.alignmentBusy) return;
     const file = event.dataTransfer.files[0];
     if (file) loadFile(kind, file);
@@ -875,6 +878,7 @@ async function loadProxyFiles(fileList) {
     if (placed.length) showToast(`Placed ${placed.length} card${placed.length === 1 ? "" : "s"}.`);
     if (failures.length) showToast(`${failures.length} image${failures.length === 1 ? "" : "s"} could not be decoded.`);
     updateExportSummary();
+    updateQualityNotice();
     requestRender();
   } catch (error) {
     showToast(sanitizeDiagnosticText(error?.message) || "The proxy images could not be decoded.");
@@ -899,9 +903,83 @@ async function loadProxyFiles(fileList) {
   });
   zone.addEventListener("drop", (event) => {
     event.preventDefault();
+    event.stopPropagation();
     if (event.dataTransfer.files?.length) loadProxyFiles(event.dataTransfer.files);
   });
 }
+
+async function applyRoutedStudioDrop(fileList) {
+  if (state.alignmentBusy || state.exportBusy || document.body.classList.contains("setup-open")) return;
+  const routed = routeStudioDroppedFiles({
+    intake: profileIntake(activeProfile()),
+    files: fileList,
+    hasArt: Boolean(state.artImage),
+    hasCard: Boolean(state.cardImage),
+  });
+  if (routed.mode === "proxies") {
+    if (!routed.files?.length) {
+      showToast("Drop PNG, JPG, or WebP card images.");
+      return;
+    }
+    await loadProxyFiles(routed.files);
+    return;
+  }
+  const assignments = routed.assignments || [];
+  if (!assignments.length) {
+    showToast("Drop PNG, JPG, or WebP images.");
+    return;
+  }
+  for (const assignment of assignments) {
+    await loadFile(assignment.kind, assignment.file);
+  }
+  if (assignments.length === 1) {
+    showToast(assignments[0].kind === "art" ? "Loaded extended artwork." : "Loaded original card.");
+  } else {
+    showToast("Loaded artwork and original card.");
+  }
+}
+
+let fileDragDepth = 0;
+
+function clearFileDragUi() {
+  fileDragDepth = 0;
+  document.body.classList.remove("file-drag-over");
+  shell.classList.remove("file-drag-over");
+}
+
+function bindPageFileDrop() {
+  const onDragEnter = (event) => {
+    if (!isFileDragEvent(event)) return;
+    event.preventDefault();
+    fileDragDepth += 1;
+    document.body.classList.add("file-drag-over");
+    if (!event.target.closest?.(".drop-card")) shell.classList.add("file-drag-over");
+  };
+  const onDragOver = (event) => {
+    if (!isFileDragEvent(event)) return;
+    event.preventDefault();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = "copy";
+  };
+  const onDragLeave = (event) => {
+    if (!isFileDragEvent(event)) return;
+    fileDragDepth = Math.max(0, fileDragDepth - 1);
+    if (fileDragDepth === 0) clearFileDragUi();
+  };
+  const onDrop = (event) => {
+    if (!isFileDragEvent(event)) return;
+    event.preventDefault();
+    clearFileDragUi();
+    if (event.target.closest?.(".drop-card")) return;
+    applyRoutedStudioDrop(event.dataTransfer.files);
+  };
+
+  window.addEventListener("dragenter", onDragEnter);
+  window.addEventListener("dragover", onDragOver);
+  window.addEventListener("dragleave", onDragLeave);
+  window.addEventListener("drop", onDrop);
+}
+
+bindPageFileDrop();
 
 function render() {
   renderQueued = false;
