@@ -89,7 +89,7 @@ body.setup-open { overflow: hidden; }
 }
 .setup-form legend span { margin-right: 9px; color: var(--coral); }
 .mode-fieldset { min-height: 0; flex: 1; display: flex; flex-direction: column; }
-.mode-grid { height: auto; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(3, minmax(132px, 1fr)); gap: 14px; }
+.mode-grid { height: auto; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: minmax(132px, auto); gap: 14px; }
 .mode-card {
   position: relative; min-width: 0; min-height: 132px; display: grid;
   grid-template-columns: 82px minmax(0, 1fr); grid-template-rows: 1fr auto; gap: 5px 15px; align-items: center;
@@ -373,6 +373,106 @@ body.setup-open { overflow: hidden; }
     0 0 0 7px #252b2c,
     0 14px 30px rgba(23,27,29,.32);
 }
+.proxy-board {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  gap: 2.2%;
+  padding: 1.5%;
+  pointer-events: auto;
+}
+.proxy-board[hidden] { display: none; }
+.proxy-seat {
+  position: relative;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  overflow: hidden;
+  border-radius: 4px;
+}
+.proxy-seat-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.proxy-seat-label {
+  position: absolute;
+  left: 6px;
+  top: 4px;
+  z-index: 1;
+  color: rgba(23, 26, 31, 0.55);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  pointer-events: none;
+}
+.proxy-seat.is-filled .proxy-seat-label {
+  color: rgba(247, 245, 239, 0.85);
+  text-shadow: 0 1px 2px rgba(0,0,0,.35);
+}
+.proxy-trash {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  opacity: 0;
+  pointer-events: none;
+  background: rgba(23, 26, 31, 0.35);
+  color: #f7f5ef;
+  transition: opacity 120ms ease;
+}
+.proxy-trash svg { width: 28px; height: 28px; }
+.proxy-seat.is-filled:hover .proxy-trash,
+.proxy-seat.is-filled:focus-visible .proxy-trash {
+  opacity: 1;
+  pointer-events: auto;
+}
+.proxy-seat.is-selected { box-shadow: inset 0 0 0 2px #2aa9b8; }
+body.file-drag-over .canvas-shell.file-drag-over,
+.canvas-shell.file-drag-over {
+  box-shadow: var(--shadow), 0 0 0 3px rgba(42, 169, 184, 0.85);
+}
+body.file-drag-over::after {
+  content: "Drop images to load";
+  position: fixed;
+  z-index: 40;
+  left: 50%;
+  top: 18px;
+  transform: translateX(-50%);
+  padding: 8px 12px;
+  border: 1px solid rgba(42, 169, 184, 0.7);
+  border-radius: 999px;
+  background: rgba(23, 26, 31, 0.88);
+  color: #f7f5ef;
+  font: 600 12px/1.2 "Segoe UI", sans-serif;
+  pointer-events: none;
+}
+body.setup-open.file-drag-over::after { display: none; }
+body.slot-fill-mode #artDrop,
+body.slot-fill-mode #cardDrop,
+body.slot-fill-mode #autoAlignButton,
+body.slot-fill-mode #autoAlignStatus,
+body.slot-fill-mode #cardToggle,
+body.slot-fill-mode #differenceToggle,
+body.slot-fill-mode .control-block:has(#opacityRange),
+body.slot-fill-mode .check-row:has(#includeCard),
+body.slot-fill-mode .package-option:has(#includeMaster),
+body.slot-fill-mode .package-option:has(#includeFullArtPdf),
+body.slot-fill-mode .package-option:has(#includeWithCardPdf),
+body.slot-fill-mode #proofButton,
+body.slot-fill-mode #alignmentCanvas,
+body.slot-fill-mode #cardPositionControls {
+  display: none !important;
+}
+body.slot-fill-mode #proxyDrop { display: grid; }
+body.slot-fill-mode #proxyBoard { display: grid; }
+body:not(.slot-fill-mode) #proxyDrop { display: none !important; }
 .frame-mode-badge {
   position: absolute; z-index: 5; top: 10px; left: 50%; transform: translateX(-50%);
   padding: 5px 8px; border: 1px solid rgba(184,149,81,.7);

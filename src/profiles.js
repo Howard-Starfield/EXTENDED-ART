@@ -133,6 +133,21 @@ export const fallbackProfiles = {
     label_box: null,
     recommended_corner_radius_mm: 0,
   },
+  proxies: {
+    name: "proxies",
+    version: PROFILE_VERSION,
+    label: "Proxies 3×3",
+    grid: [3, 3],
+    piece_count: 9,
+    insert_mm: [63, 88],
+    insert_px: [744, 1039],
+    master_mm: [189, 264],
+    master_px: [2232, 3117],
+    card_box: [0, 0, 1, 1],
+    label_box: null,
+    recommended_corner_radius_mm: 3,
+    intake: "slot-fill",
+  },
 };
 
 export const fallbackPapers = {
@@ -154,6 +169,14 @@ export function isSlabProfile(profile) {
 
 export function isSingleDisplayProfile(profile) {
   return isSlabProfile(profile) || profile?.name === "photo8x10";
+}
+
+export function profileIntake(profile) {
+  return profile?.intake === "slot-fill" ? "slot-fill" : "align";
+}
+
+export function isSlotFillProfile(profile) {
+  return profileIntake(profile) === "slot-fill";
 }
 
 export function psaLabelBox(profile, widthMm, heightMm) {
@@ -244,6 +267,9 @@ export function paperFit(profile, paperName, papers = fallbackPapers) {
 }
 
 export function profileSummary(profile, paper) {
+  if (isSlotFillProfile(profile)) {
+    return `9 playable cards + ${paper.label} PDF`;
+  }
   const unit = profile.piece_count === 1
     ? (profile.name === "photo8x10" ? "print" : profile.name === "cardslab" ? "centered card" : "insert")
     : "printed inserts + center card";
