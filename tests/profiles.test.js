@@ -8,6 +8,7 @@ import {
   fallbackPapers,
   fallbackProfiles,
   paperFit,
+  profileSummary,
   psaLabelBox,
 } from "../src/profiles.js";
 
@@ -129,6 +130,33 @@ describe("effectiveCardBox", () => {
   it("treats missing piece_count as a single-card profile", () => {
     const profile = { card_box: [0.1, 0.1, 0.2, 0.2], master_px: [1000, 1000] };
     expect(effectiveCardBox(profile, 200, 200)).toEqual([0.1, 0.1, 0.2, 0.2]);
+  });
+});
+
+describe("proxies profile contract", () => {
+  it("prints nine playable 63 by 88 millimetre cards", () => {
+    const profile = fallbackProfiles.proxies;
+    expect(profile.intake).toBe("slot-fill");
+    expect(profile.piece_count).toBe(9);
+    expect(profile.grid).toEqual([3, 3]);
+    expect(profile.insert_mm).toEqual([63, 88]);
+    expect(profile.insert_px).toEqual([744, 1039]);
+    expect(profile.master_mm).toEqual([189, 264]);
+    expect(profile.master_px).toEqual([2232, 3117]);
+    expect(profile.card_box).toEqual([0, 0, 1, 1]);
+    expect(cardPhysicalMm(profile)[0]).toBeCloseTo(189, 8);
+    expect(cardPhysicalMm(profile)[1]).toBeCloseTo(264, 8);
+  });
+
+  it("summarizes proxies as nine playable cards", () => {
+    expect(profileSummary(fallbackProfiles.proxies, fallbackPapers.a4)).toBe(
+      "9 playable cards + A4 PDF",
+    );
+  });
+
+  it("fits the 3x3 proxy sheet on A4 and Letter at exact size", () => {
+    expect(paperFit(fallbackProfiles.proxies, "a4").scale).toBe(1);
+    expect(paperFit(fallbackProfiles.proxies, "letter").scale).toBe(1);
   });
 });
 

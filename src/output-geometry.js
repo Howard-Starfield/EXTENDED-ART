@@ -1,4 +1,4 @@
-import { effectiveCardBox, isSlabProfile } from "./profiles.js";
+import { effectiveCardBox, isSlabProfile, isSlotFillProfile } from "./profiles.js";
 
 export const GUIDE_CLEARANCE_PT = 0.25;
 export const GUIDE_STROKE_PT = 0.5;
@@ -56,7 +56,7 @@ export function getCutoutGeometry(
   if ((profile.name === "psa" || profile.name === "psaMini") && labelBox) {
     cutouts.push({ id: "PSA_LABEL", label: "PSA LABEL CUTOUT", box: labelBox, radiusMm: cornerRadiusMm });
   }
-  if (isSlabProfile(profile) || profile.name === "photo8x10" || (profile.grid?.[0] === 3 && profile.grid?.[1] === 3)) {
+  if (isSlabProfile(profile) || profile.name === "photo8x10" || (profile.grid?.[0] === 3 && profile.grid?.[1] === 3 && !isSlotFillProfile(profile))) {
     const cardBox = effectiveCardBox(profile, cardOffsetX, cardOffsetY);
     if (isSlabProfile(profile)) {
       cutouts.push({ id: "CARD", label: "CARD CUTOUT", box: cardBox, radiusMm: cornerRadiusMm });

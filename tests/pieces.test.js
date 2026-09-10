@@ -29,6 +29,19 @@ describe("deterministic output pieces", () => {
     expect(all.every((piece) => piece.output.width === 780 && piece.output.height === 1075)).toBe(true);
   });
 
+  it("keeps all nine proxy seats printable at 744 by 1039 pixels", () => {
+    expect(mmToPixels(63)).toBeCloseTo(744.094, 3);
+    expect(mmToPixels(88)).toBeCloseTo(1039.37, 2);
+    const all = getPieceGeometry(fallbackProfiles.proxies);
+    const printable = getPrintablePieceGeometry(fallbackProfiles.proxies);
+    expect(all.map((piece) => piece.id)).toEqual([...BINDER_POSITION_IDS]);
+    expect(printable.map((piece) => piece.id)).toEqual([...BINDER_POSITION_IDS]);
+    expect(all.every((piece) => piece.printable)).toBe(true);
+    expect(all.every((piece) => piece.output.width === 744 && piece.output.height === 1039)).toBe(true);
+    expect(all.reduce((sum, piece) => sum + piece.source.width, 0) / 3).toBe(2232);
+    expect(all.filter((piece) => piece.column === 0).reduce((sum, piece) => sum + piece.source.height, 0)).toBe(3117);
+  });
+
   it("keeps Vault source rounding independent from canonical piece dimensions", () => {
     const all = getPieceGeometry(fallbackProfiles.vaultx);
     expect(all.map((piece) => piece.source.height)).toEqual([

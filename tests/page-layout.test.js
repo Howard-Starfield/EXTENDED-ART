@@ -67,4 +67,28 @@ describe("exact page layout contract", () => {
       expect(a4.placements[0].heightPt).toBeCloseTo(letter.placements[0].heightPt, 8);
     }
   });
+
+  it("prints all nine proxy seats at 63 by 88 millimetres", () => {
+    const layout = createPageLayout(fallbackProfiles.proxies, fallbackPapers.a4);
+    expect(layout.pageCount).toBe(1);
+    expect(layout.status).toBe("exact_one_page");
+    expect(layout.placements).toHaveLength(9);
+    expect(layout.placements.map((placement) => placement.pieceId)).toEqual([
+      "TL", "TC", "TR", "ML", "C", "MR", "BL", "BC", "BR",
+    ]);
+    expect(layout.placements[0].widthPt).toBeCloseTo(millimetersToPoints(63), 8);
+    expect(layout.placements[0].heightPt).toBeCloseTo(millimetersToPoints(88), 8);
+  });
+
+  it("keeps a lone bottom-right proxy in its seat when other seats are empty", () => {
+    const layout = createPageLayout(fallbackProfiles.proxies, fallbackPapers.a4, {
+      pieceIds: ["BR"],
+    });
+    expect(layout.placements).toHaveLength(1);
+    expect(layout.placements[0].pieceId).toBe("BR");
+    const full = createPageLayout(fallbackProfiles.proxies, fallbackPapers.a4);
+    const brFull = full.placements.find((placement) => placement.pieceId === "BR");
+    expect(layout.placements[0].xPt).toBeCloseTo(brFull.xPt, 8);
+    expect(layout.placements[0].yPt).toBeCloseTo(brFull.yPt, 8);
+  });
 });

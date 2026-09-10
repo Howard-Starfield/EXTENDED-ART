@@ -51,7 +51,7 @@ function placementFor({ profile, paper, pageIndex, piece, rows, group, page }) {
   };
 }
 
-export function createPageLayout(profile, paper, { includeCenter = false, excludeCol, excludeRow } = {}) {
+export function createPageLayout(profile, paper, { includeCenter = false, excludeCol, excludeRow, pieceIds = null } = {}) {
   const page = paperPagePoints(paper);
   // For the cut-ready PDF: whichever cell the user picked is the one
   // that's missing (because the original card goes there). The center is
@@ -59,9 +59,15 @@ export function createPageLayout(profile, paper, { includeCenter = false, exclud
   // For the with-card reference PDF: `includeCenter: true` includes all
   // 9 cells regardless of the pick, so the card overlay can land on
   // any of them.
-  const pieces = includeCenter
+  // For proxies: `pieceIds` keep empty seats as holes so filled cards
+  // stay in their grid seats.
+  let pieces = includeCenter
     ? getPieceGeometry(profile)
     : getPrintablePieceGeometry(profile, excludeCol, excludeRow);
+  if (pieceIds) {
+    const allowed = new Set(pieceIds);
+    pieces = pieces.filter((piece) => allowed.has(piece.id));
+  }
   const groups = rowGroups(profile, paper.name);
   const warnings = [];
   const pages = [];

@@ -7,6 +7,7 @@ import {
   fallbackPapers,
   fallbackProfiles,
   isSlabProfile,
+  isSlotFillProfile,
   PROFILE_VERSION,
   pixelPair,
   profileSummary,
@@ -29,12 +30,28 @@ import { CENTER_FIT_ALIGNMENT } from "./src/alignment.js";
 import { createMatcherJobRunner } from "./src/matcher.js";
 import { drawAlignmentScene, drawArtworkProof } from "./src/renderer.js";
 import { triggerDownload, withPrintMetadata } from "./src/png.js";
+import { createProxyBoard } from "./src/proxy-board.js";
+import {
+  ensureProxyBoard,
+  filledProxyCount,
+  ingestProxyFiles,
+  mountProxyBoard,
+  paintProxyBoard,
+  panSelectedProxy,
+  removeProxySlot,
+  resetSelectedProxyTransform,
+  selectProxySeat,
+  zoomSelectedProxy,
+} from "./src/proxy-studio.js";
 
 const $ = (selector) => document.querySelector(selector);
 const canvas = $("#alignmentCanvas");
 const shell = $("#canvasShell");
+const proxyBoardEl = $("#proxyBoard");
 const ctx = canvas.getContext("2d", { alpha: false, colorSpace: "srgb" });
 const state = createInitialState(fallbackProfiles, fallbackPapers);
+state.proxyBoard = createProxyBoard();
+mountProxyBoard(proxyBoardEl);
 
 let toastTimer;
 let renderQueued = false;
@@ -46,6 +63,10 @@ let activeAlignmentContext = null;
 
 function activeProfile() {
   return state.profiles[state.profile] || fallbackProfiles.standard;
+}
+
+function slotFillActive() {
+  return isSlotFillProfile(activeProfile());
 }
 
 function activePaper() {
@@ -95,16 +116,19 @@ function updateExportSummary() {
   const selected = [
     $("#includeSecondPaper").checked ? "A4 + US Letter" : "",
     $("#includePieces").checked ? "piece PNGs" : "",
-    $("#includeMaster").checked ? "master PNG" : "",
-    $("#includeFullArtPdf").checked ? "full-art PDF" : "",
-    $("#includeWithCardPdf").checked ? "with-card PDF" : "",
+    !slotFillActive() && $("#includeMaster").checked ? "master PNG" : "",
+    !slotFillActive() && $("#includeFullArtPdf").checked ? "full-art PDF" : "",
+    !slotFillActive() && $("#includeWithCardPdf").checked ? "with-card PDF" : "",
   ].filter(Boolean);
   $("#exportButtonCopy").textContent = selected.length
     ? selected.join(", ") + " | cut-ready PDF + print guide included"
     : "Cut-ready PDF + print guide included";
+  const canExport = slotFillActive()
+    ? filledProxyCount(state) > 0
+    : Boolean(state.artImage && state.cardImage);
   $("#exportButton").disabled = state.alignmentBusy
     || state.exportBusy
-    || !(state.artImage && state.cardImage);
+    || !canExport;
 }
 
 function updatePaperTools() {
@@ -145,7 +169,13 @@ function updateSetupWizard() {
 function updateStudioContract() {
   const profile = activeProfile();
   const paper = activePaper();
-  const isBinder = profile.grid[0] > 1;
+  const slotFill = isSlotFillProfile(profile);
+  const isBinder = profile.grid[0] > 1 && !slotFill;
+  document.body.classList.toggle("slot-fill-mode", slotFill);
+  proxyBoardEl.hidden = !slotFill;
+  $("#proxyDrop").hidden = !slotFill;
+  $("#artDrop").hidden = slotFill;
+  $("#cardDrop").hidden = slotFill;
   shell.style.aspectRatio = `${profile.master_px[0]} / ${profile.master_px[1]}`;
   shell.classList.toggle("photo-frame-mode", profile.name === "photo8x10");
   shell.classList.toggle("slab-mode", isSlabProfile(profile));
@@ -154,37 +184,50 @@ function updateStudioContract() {
     ? "8 × 10 frame preview"
     : profile.name === "cardslab"
       ? "card slab · centered card"
-      : "";
+      : profile.name === "proxies"
+        ? "proxies · 63 × 88 mm"
+        : "";
   modeBadge.textContent = badgeText;
   modeBadge.hidden = !badgeText;
   $(".light-table").dataset.paper = state.paper;
   $("#activeSpec").textContent = `${profile.label} | ${pixelPair(profile.master_px)} px | ${paper.label} | 300 DPI`;
-  $("#artDropTitle").textContent = isBinder
-    ? `Extended ${profile.grid[0]}×${profile.grid[1]} artwork`
-    : `Extended ${profile.label} artwork`;
-  $("#artDropCopy").textContent = isBinder
-    ? "Drop or choose the continuous extended scene"
-    : "Drop or choose the full display artwork";
-  $("#methodCopy").textContent = isBinder
-    ? "The original card is required for the automatic baseline. Drag the extended artwork underneath the fixed center reference until the edges meet."
-    : "The original card is required for the automatic baseline. The card zone stays fixed while you refine the display scene underneath it.";
-  $("#emptyStateCopy").textContent = isBinder
-    ? `Drop the full ${profile.grid[0]}x${profile.grid[1]} image on the left to begin.`
-    : `Drop the full ${profile.label} image on the left to begin.`;
+  if (slotFill) {
+    $("#methodCopy").textContent = "Drop card images into the 3×3 board. Select a seat to pan and zoom. Hover a filled seat to remove it. Empty seats fill first; a full board replaces the oldest card.";
+    $("#emptyStateTitle").textContent = "Drop proxy card images";
+    $("#emptyStateCopy").textContent = "Each seat prints at 63 × 88 mm. Add cards on the left, then refine with drag and zoom.";
+    $(".workspace-title p").textContent = "Fill the proxy sheet";
+    $("#cutReadyOutputHelp").textContent = "Nine seats max · dotted outer cut guides";
+    $("#pieceContractLabel").textContent = "Card";
+  } else {
+    $("#artDropTitle").textContent = isBinder
+      ? `Extended ${profile.grid[0]}×${profile.grid[1]} artwork`
+      : `Extended ${profile.label} artwork`;
+    $("#artDropCopy").textContent = isBinder
+      ? "Drop or choose the continuous extended scene"
+      : "Drop or choose the full display artwork";
+    $("#methodCopy").textContent = isBinder
+      ? "The original card is required for the automatic baseline. Drag the extended artwork underneath the fixed center reference until the edges meet."
+      : "The original card is required for the automatic baseline. The card zone stays fixed while you refine the display scene underneath it.";
+    $("#emptyStateTitle").textContent = "Place your extended artwork";
+    $("#emptyStateCopy").textContent = isBinder
+      ? `Drop the full ${profile.grid[0]}x${profile.grid[1]} image on the left to begin.`
+      : `Drop the full ${profile.label} image on the left to begin.`;
+    $(".workspace-title p").textContent = "Align the scene";
+    $("#cutReadyOutputHelp").textContent = profile.name === "psa" || profile.name === "psaMini"
+      ? "White PSA label + card chambers with dotted guides"
+      : profile.name === "cardslab" || profile.name === "psaCase"
+        ? "White centered card chamber with dotted guide"
+        : "Finished outer pieces with cut guides";
+    $("#pieceContractLabel").textContent = profile.piece_count === 1 ? "Output" : "Insert";
+  }
   setRuler($("#rulerX"), profile.master_mm[0], profile.grid[0], " mm");
   setRuler($("#rulerY"), profile.master_mm[1], profile.grid[1], "");
   $("#masterContract").textContent = pixelPair(profile.master_px);
-  $("#pieceContractLabel").textContent = profile.piece_count === 1 ? "Output" : "Insert";
   $("#pieceContract").textContent = pixelPair(profile.insert_px);
   $("#paperContract").textContent = `${paper.label} / ${paper.size_mm.map(cleanMeasure).join(" × ")} mm`;
   $("#includeCardHelp").textContent = "Off by default to save ink; the cut-ready package leaves the center/card chamber empty.";
-  $("#cutReadyOutputHelp").textContent = profile.name === "psa" || profile.name === "psaMini"
-    ? "White PSA label + card chambers with dotted guides"
-    : profile.name === "cardslab" || profile.name === "psaCase"
-      ? "White centered card chamber with dotted guide"
-      : "Finished outer pieces with cut guides";
   $("#psaLabelControls").hidden = profile.name !== "psa" && profile.name !== "psaMini";
-  $("#cardPositionControls").hidden = !profile.piece_count || profile.piece_count <= 1;
+  $("#cardPositionControls").hidden = slotFill || !profile.piece_count || profile.piece_count <= 1;
   syncCardPositionControls();
   updatePaperTools();
   updateExportSummary();
@@ -235,12 +278,12 @@ function applySetup(event) {
     $("#radiusValue").textContent = `${cleanMeasure(state.cornerRadiusMm)} mm`;
     state.lastStableAlignment = null;
     state.alignmentSnapshot = null;
-    applyCenterFit();
+    if (!isSlotFillProfile(activeProfile())) applyCenterFit();
     // Reset the original-card cell back to the centre of the new profile so
     // an offset tuned for, say, "standard 3x3" doesn't strand the card in an
     // out-of-bounds position on "vaultx".
     const profile = activeProfile();
-    if (profile.piece_count > 1) {
+    if (!isSlotFillProfile(profile) && profile.piece_count > 1) {
       const [cols, rows] = profile.grid;
       const [centerX, centerY] = cellCardOffset(profile, Math.floor(cols / 2), Math.floor(rows / 2));
       state.cardOffsetX = centerX;
@@ -254,7 +297,9 @@ function applySetup(event) {
   updateStudioContract();
   closeSetup();
   $("#changeSetupButton").focus();
-  if (profileChanged && state.artImage && state.cardImage) startAlignment("profile changed");
+  if (profileChanged && !isSlotFillProfile(activeProfile()) && state.artImage && state.cardImage) {
+    startAlignment("profile changed");
+  }
 }
 
 document.querySelectorAll('input[name="profile"], input[name="paper"]').forEach((input) => {
@@ -294,20 +339,27 @@ function requestRender() {
 }
 
 function updateQualityNotice() {
-  const messages = [
-    ...(state.artQuality?.warnings || []),
-    ...(state.cardQuality?.warnings || []),
-  ];
+  const messages = [];
   const profile = activeProfile();
-  if (state.artDimensions) {
-    messages.push(classifyEffectiveDpi("Extended artwork", state.artDimensions, profile.master_mm[0]).message);
-  }
-  if (state.cardDimensions) {
-    const cardMm = cardPhysicalMm(profile);
-    messages.push(classifyEffectiveDpi("Original card", state.cardDimensions, cardMm[0]).message);
+  if (isSlotFillProfile(profile)) {
+    ensureProxyBoard(state).slots.forEach((slot, index) => {
+      if (!slot?.dimensions) return;
+      const id = ["TL", "TC", "TR", "ML", "C", "MR", "BL", "BC", "BR"][index];
+      const report = classifyEffectiveDpi(`Proxy ${id}`, slot.dimensions, 63);
+      if (report.level !== "pass") messages.push(report.message);
+    });
+  } else {
+    messages.push(...(state.artQuality?.warnings || []), ...(state.cardQuality?.warnings || []));
+    if (state.artDimensions) {
+      messages.push(classifyEffectiveDpi("Extended artwork", state.artDimensions, profile.master_mm[0]).message);
+    }
+    if (state.cardDimensions) {
+      const cardMm = cardPhysicalMm(profile);
+      messages.push(classifyEffectiveDpi("Original card", state.cardDimensions, cardMm[0]).message);
+    }
   }
   const notice = $("#qualityNotice");
-  const uniqueMessages = [...new Set(messages)];
+  const uniqueMessages = [...new Set(messages.filter(Boolean))];
   if (!uniqueMessages.length) {
     notice.hidden = true;
     notice.textContent = "";
@@ -814,9 +866,63 @@ function bindDropZone(zoneSelector, inputSelector, kind) {
 bindDropZone("#artDrop", "#artInput", "art");
 bindDropZone("#cardDrop", "#cardInput", "card");
 
+async function loadProxyFiles(fileList) {
+  if (!fileList?.length || state.exportBusy) return;
+  try {
+    const { placed, failures } = await ingestProxyFiles(state, fileList);
+    $("#proxyMeta").textContent = `${filledProxyCount(state)} / 9 seats filled`;
+    $("#proxyDrop").classList.toggle("loaded", filledProxyCount(state) > 0);
+    if (placed.length) showToast(`Placed ${placed.length} card${placed.length === 1 ? "" : "s"}.`);
+    if (failures.length) showToast(`${failures.length} image${failures.length === 1 ? "" : "s"} could not be decoded.`);
+    updateExportSummary();
+    requestRender();
+  } catch (error) {
+    showToast(sanitizeDiagnosticText(error?.message) || "The proxy images could not be decoded.");
+  }
+}
+
+{
+  const zone = $("#proxyDrop");
+  const input = $("#proxyInput");
+  input.addEventListener("change", () => {
+    loadProxyFiles(input.files);
+    input.value = "";
+  });
+  ["dragenter", "dragover"].forEach((eventName) => {
+    zone.addEventListener(eventName, (event) => {
+      event.preventDefault();
+      zone.classList.add("dragging");
+    });
+  });
+  ["dragleave", "drop"].forEach((eventName) => {
+    zone.addEventListener(eventName, () => zone.classList.remove("dragging"));
+  });
+  zone.addEventListener("drop", (event) => {
+    event.preventDefault();
+    if (event.dataTransfer.files?.length) loadProxyFiles(event.dataTransfer.files);
+  });
+}
+
 function render() {
   renderQueued = false;
   const profile = activeProfile();
+  if (isSlotFillProfile(profile)) {
+    const board = ensureProxyBoard(state);
+    const filled = filledProxyCount(state) > 0;
+    $("#emptyState").hidden = filled;
+    paintProxyBoard(proxyBoardEl, board, profile, state.cornerRadiusMm);
+    const selected = board.selectedIndex != null ? board.slots[board.selectedIndex] : null;
+    if (selected) {
+      const percent = Math.round((selected.transform.zoom || 1) * 100);
+      $("#zoomRange").value = String(Math.min(250, Math.max(100, percent)));
+      $("#zoomValue").textContent = `${percent}%`;
+      $("#offsetValue").textContent = `Seat ${proxyBoardEl.querySelector(".proxy-seat.is-selected")?.dataset.index ?? "-"}`;
+    } else {
+      $("#offsetValue").textContent = "Select a seat";
+    }
+    updateExportSummary();
+    return;
+  }
   const rect = shell.getBoundingClientRect();
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   canvas.width = Math.max(1, Math.round(rect.width * dpr));
@@ -859,7 +965,25 @@ function resetAlignment(announce = true, remember = true) {
 }
 
 shell.addEventListener("pointerdown", (event) => {
-  if (state.alignmentBusy || !state.artImage) return;
+  if (state.alignmentBusy) return;
+  if (slotFillActive()) {
+    if (event.target.closest(".proxy-trash")) return;
+    const seat = event.target.closest(".proxy-seat");
+    if (!seat) return;
+    const index = Number(seat.dataset.index);
+    selectProxySeat(state, index);
+    if (!state.proxyBoard.slots[index]) {
+      requestRender();
+      return;
+    }
+    state.dragging = true;
+    state.pointerX = event.clientX;
+    state.pointerY = event.clientY;
+    shell.setPointerCapture(event.pointerId);
+    requestRender();
+    return;
+  }
+  if (!state.artImage) return;
   state.dragging = true;
   state.pointerX = event.clientX;
   state.pointerY = event.clientY;
@@ -868,10 +992,17 @@ shell.addEventListener("pointerdown", (event) => {
 shell.addEventListener("pointermove", (event) => {
   if (state.alignmentBusy || !state.dragging) return;
   const rect = shell.getBoundingClientRect();
-  state.offsetX += (event.clientX - state.pointerX) / rect.width;
-  state.offsetY += (event.clientY - state.pointerY) / rect.height;
+  const dx = (event.clientX - state.pointerX) / rect.width;
+  const dy = (event.clientY - state.pointerY) / rect.height;
   state.pointerX = event.clientX;
   state.pointerY = event.clientY;
+  if (slotFillActive()) {
+    panSelectedProxy(state, dx * 3, dy * 3, activeProfile());
+    requestRender();
+    return;
+  }
+  state.offsetX += dx;
+  state.offsetY += dy;
   rememberStableAlignment("user-corrected");
   requestRender();
 });
@@ -879,7 +1010,16 @@ shell.addEventListener("pointermove", (event) => {
   shell.addEventListener(eventName, () => { state.dragging = false; });
 });
 shell.addEventListener("wheel", (event) => {
-  if (state.alignmentBusy || !state.artImage) return;
+  if (state.alignmentBusy) return;
+  if (slotFillActive()) {
+    if (state.proxyBoard.selectedIndex == null) return;
+    event.preventDefault();
+    const direction = event.deltaY > 0 ? -0.05 : 0.05;
+    zoomSelectedProxy(state, direction, activeProfile());
+    requestRender();
+    return;
+  }
+  if (!state.artImage) return;
   event.preventDefault();
   const direction = event.deltaY > 0 ? -0.03 : 0.03;
   state.zoom = Math.min(2.5, Math.max(1, state.zoom + direction));
@@ -893,6 +1033,11 @@ shell.addEventListener("wheel", (event) => {
 function nudge(dx, dy, amount = 1) {
   if (state.alignmentBusy) return;
   const profile = activeProfile();
+  if (slotFillActive()) {
+    panSelectedProxy(state, (dx * amount) / profile.insert_px[0], (dy * amount) / profile.insert_px[1], profile);
+    requestRender();
+    return;
+  }
   state.offsetX += (dx * amount) / profile.master_px[0];
   state.offsetY += (dy * amount) / profile.master_px[1];
   rememberStableAlignment("user-corrected");
@@ -900,6 +1045,14 @@ function nudge(dx, dy, amount = 1) {
 }
 
 shell.addEventListener("keydown", (event) => {
+  if (slotFillActive() && (event.key === "Delete" || event.key === "Backspace")) {
+    const index = state.proxyBoard?.selectedIndex;
+    if (index == null) return;
+    event.preventDefault();
+    removeProxySlot(state, index);
+    requestRender();
+    return;
+  }
   const moves = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0] };
   if (state.alignmentBusy || !moves[event.key]) return;
   event.preventDefault();
@@ -912,7 +1065,27 @@ document.querySelectorAll("[data-nudge]").forEach((button) => {
     nudge(values[0], values[1], 4);
   });
 });
-$("#resetButton").addEventListener("click", () => resetAlignment());
+$("#resetButton").addEventListener("click", () => {
+  if (slotFillActive()) {
+    resetSelectedProxyTransform(state, activeProfile());
+    requestRender();
+    showToast("Selected proxy reset to cover-fit.");
+    return;
+  }
+  resetAlignment();
+});
+
+proxyBoardEl.addEventListener("click", (event) => {
+  const trash = event.target.closest(".proxy-trash");
+  if (!trash) return;
+  event.preventDefault();
+  event.stopPropagation();
+  const seat = trash.closest(".proxy-seat");
+  if (!seat) return;
+  removeProxySlot(state, Number(seat.dataset.index));
+  requestRender();
+  showToast("Proxy seat cleared.");
+});
 
 // Card position cell picker (binders only — UI is hidden otherwise).
 // Each of the 9 buttons snaps the original card to that binder cell and the
@@ -957,6 +1130,16 @@ $("#resetCardPosition")?.addEventListener("click", () => {
 
 $("#zoomRange").addEventListener("input", (event) => {
   if (state.alignmentBusy) return;
+  if (slotFillActive()) {
+    const board = ensureProxyBoard(state);
+    const index = board.selectedIndex;
+    if (index == null || !board.slots[index]) return;
+    const zoom = Number(event.target.value) / 100;
+    zoomSelectedProxy(state, zoom - board.slots[index].transform.zoom, activeProfile());
+    $("#zoomValue").textContent = `${event.target.value}%`;
+    requestRender();
+    return;
+  }
   state.zoom = Number(event.target.value) / 100;
   $("#zoomValue").textContent = `${event.target.value}%`;
   rememberStableAlignment("user-corrected");
@@ -1035,8 +1218,12 @@ $("#exitAppButton").addEventListener("click", () => {
 });
 $("#exportButton").addEventListener("click", async () => {
   if (state.alignmentBusy || state.exportBusy) return;
-  if (!(state.artImage && state.cardImage)) return;
-  if (state.qualityReport?.overallStatus === "BLOCKED") {
+  if (slotFillActive()) {
+    if (!filledProxyCount(state)) return;
+  } else if (!(state.artImage && state.cardImage)) {
+    return;
+  }
+  if (!slotFillActive() && state.qualityReport?.overallStatus === "BLOCKED") {
     showToast("Resolve the blocked source-quality warning before exporting.");
     return;
   }
@@ -1047,23 +1234,40 @@ $("#exportButton").addEventListener("click", async () => {
   setProgressVisible(true);
   setExportProgress({ stage: "Preparing package", progress: 0 });
   try {
-    const { createBrowserPrintPackage } = await import("./src/export.js");
-    const result = await createBrowserPrintPackage({
-      state,
-      profile: activeProfile(),
-      paper: activePaper(),
-      exportOptions: {
-        includeSecondPaper: $("#includeSecondPaper").checked,
+    let result;
+    if (slotFillActive()) {
+      const { createProxiesPrintPackage } = await import("./src/proxy-export.js");
+      result = await createProxiesPrintPackage({
+        board: ensureProxyBoard(state),
+        profile: activeProfile(),
+        paper: activePaper(),
+        papers: state.papers,
+        cornerRadiusMm: state.cornerRadiusMm,
         includePieces: $("#includePieces").checked,
-        includeMaster: $("#includeMaster").checked,
-        includeFullArtPdf: $("#includeFullArtPdf").checked,
-        includeWithCardPdf: $("#includeWithCardPdf").checked,
-        includeCard: includeCardRequested(),
-      },
-      documentRef: document,
-      signal: exportController.signal,
-      onProgress: setExportProgress,
-    });
+        includeSecondPaper: $("#includeSecondPaper").checked,
+        documentRef: document,
+        signal: exportController.signal,
+        onProgress: setExportProgress,
+      });
+    } else {
+      const { createBrowserPrintPackage } = await import("./src/export.js");
+      result = await createBrowserPrintPackage({
+        state,
+        profile: activeProfile(),
+        paper: activePaper(),
+        exportOptions: {
+          includeSecondPaper: $("#includeSecondPaper").checked,
+          includePieces: $("#includePieces").checked,
+          includeMaster: $("#includeMaster").checked,
+          includeFullArtPdf: $("#includeFullArtPdf").checked,
+          includeWithCardPdf: $("#includeWithCardPdf").checked,
+          includeCard: includeCardRequested(),
+        },
+        documentRef: document,
+        signal: exportController.signal,
+        onProgress: setExportProgress,
+      });
+    }
     if (state.packageUrl) URL.revokeObjectURL(state.packageUrl);
     const packageBlob = new Blob([result.bytes], { type: "application/zip" });
     state.packageUrl = URL.createObjectURL(packageBlob);
